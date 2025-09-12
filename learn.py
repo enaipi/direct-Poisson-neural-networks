@@ -18,7 +18,7 @@ from TrajectoryDataset import TrajectoryDataset
 
 #declare default values of parameters
 DEFAULT_dataset = "data/dataset.xyz"
-DEFAULT_batch_size = 20
+DEFAULT_batch_size = 32
 DEFAULT_dt = 0.1 
 DEFAULT_learning_rate = 1.0e-05
 DEFAULT_epochs = 10 
@@ -33,7 +33,7 @@ class Learner(object):
     This is the fundamental class that provides the capability to learn dynamical systems, 
     using various methods of learning (without Jacobi identity, with softly enforced Jacobi, and with implicitly valid Jacobi).
     """
-    def __init__(self, model, batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, cuda = False, dissipative = False, dropout_rate=0.0, quad_features=False):   # added dropout parameter
+    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0, quad_features=False):   # added dropout parameter
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -71,25 +71,16 @@ class Learner(object):
         self.df = pd.read_csv(name+"/"+DEFAULT_dataset, dtype=np.float32)
 
         self.energy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
-        self.L_tensor = TensorNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate)  # added dropout parameter
+        self.L_tensor = TensorNet(dim, neurons, layers, max(batch_size, simulation_batch_size), dropout_rate=dropout_rate)  # added dropout parameter
         self.jac_vec = JacVectorNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate)  # added dropout parameter
         self.entropy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
-        self.device = None
 
-        self.device = None
-        if cuda and torch.cuda.is_available():
-            self.device = torch.device("cuda")
-            print(f"Using GPU: {torch.cuda.get_device_name()}")
-        else:
-            self.device = torch.device("cpu") if cuda else None
-            print("Using CPU")
-
-        if self.device is not None:
-            self.energy = self.energy.to(self.device)
-            self.L_tensor = self.L_tensor.to(self.device)
-            self.jac_vec = self.jac_vec.to(self.device)
-            self.entropy = self.entropy.to(self.device)
-            # self.dispot = self.dispot.to(self.device)
+        self.device = device
+        self.energy = self.energy.to(self.device)
+        self.L_tensor = self.L_tensor.to(self.device)
+        self.jac_vec = self.jac_vec.to(self.device)
+        self.entropy = self.entropy.to(self.device)
+        # self.dispot = self.dispot.to(self.device)
 
         self.train, self.test = train_test_split(self.df, test_size=0.4)
         self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device)
@@ -105,12 +96,12 @@ class Learner(object):
         #constant in M
 
         #for soft and without
-        self.train_metric = torchmetrics.MeanSquaredError().to(self.device) if self.device is not None else torchmetrics.MeanSquaredError()
-        self.val_metric = torchmetrics.MeanSquaredError().to(self.device) if self.device is not None else torchmetrics.MeanSquaredError()
+        self.train_metric = torchmetrics.MeanSquaredError().to(self.device)
+        self.val_metric = torchmetrics.MeanSquaredError().to(self.device)
 
         #for Jacobi
-        self.train_metric_reg = torchmetrics.MeanSquaredError().to(self.device) if self.device is not None else torchmetrics.MeanSquaredError()
-        self.val_metric_reg = torchmetrics.MeanSquaredError().to(self.device) if self.device is not None else torchmetrics.MeanSquaredError()
+        self.train_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
+        self.val_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
 
         self.loss_fn = torch.nn.MSELoss()
 

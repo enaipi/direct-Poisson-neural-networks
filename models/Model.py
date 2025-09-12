@@ -87,21 +87,17 @@ class TensorNet(nn.Module):
         self.batch_size = batch_size
 
         self.inputDense = nn.Linear(dim, neurons)
-        print("dim", dim)
-        self.hidden = [nn.Linear(neurons, neurons)
-                       for i in range(layers-1)]
+     
+        self.hidden = [nn.Linear(neurons, neurons) for _ in range(layers-1)]
         self.hidden = nn.ModuleList(self.hidden)
         self.outputSize = int(dim*(dim-1)/2)
         self.outputDense = nn.Linear(neurons, self.outputSize) #input, output = number of independent entries of the skew-symmetric L
-        tri_i = torch.triu_indices(dim, dim, 1) #gives two rows: The first contains rows indexes of the upper triangle, the second contains the column indexes. One diagonal (the main) is skipped. The row size is the number of independent components of L.
-        #print(tri_i)
         self.sym_sing = -1
+        
+        tri_i = torch.triu_indices(dim, dim, 1) #gives two rows: The first contains rows indexes of the upper triangle, the second contains the column indexes. One diagonal (the main) is skipped. The row size is the number of independent components of L.
         batch_i = torch.tensor([i for i in range(batch_size) for _ in range(tri_i.size(1))]) #batch-numbers, add as many numbers as independent components of L
-        #print(batch_i)
         tri_rep = tri_i.repeat(1, batch_size) #repeat batch-size times horizontally
-        #print(tri_rep)
         self.indices = torch.stack((batch_i, tri_rep[0], tri_rep[1]))
-        #print("indices=",self.indices)
 
         self.dropout = nn.Dropout(dropout_rate)  # defined the dropout module
 
@@ -124,10 +120,8 @@ class TensorNet(nn.Module):
             x = self.dropout(x)  # added dropout
         data = self.outputDense(x)
         b_n = data.size(0) if data.dim() > 1 else 1
-        #print("b_n = ", b_n)
         z = torch.zeros(b_n, self.dim, self.dim, device=data.device)
         #print(z)
-        #print("ravel=", data.ravel())
         z[self.indices[0, :b_n*self.outputSize], 
         self.indices[1, :b_n*self.outputSize],
         self.indices[2, :b_n*self.outputSize]] = data.ravel()
@@ -135,8 +129,7 @@ class TensorNet(nn.Module):
         output = z + self.sym_sing*z.transpose(1, 2)
         return output
         
-        #antisymmetry
-
+#antisymmetry
 class JacVectorNet(nn.Module):
     def __init__(self, dim, neurons, layers, batch_size, dropout_rate=0.0):  # added dropout parameter
         """

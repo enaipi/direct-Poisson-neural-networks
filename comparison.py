@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from math import sqrt
 from learn import *
 import torch.multiprocessing as mp
+import torch
 
 
 def norm(x, y, z):
@@ -78,16 +79,27 @@ def generate_initial_conditions(args, device="cpu"):
 
     init_m = sample_within_ball(m_radius, args.points, device)
     init_r = sample_within_ball(r_radius, args.points, device)
+    return torch.cat([init_m, init_r], dim=1)
 
-    result = argparse.Namespace(**vars(args))
-    result.init_mx = init_m[:, 0]
-    result.init_my = init_m[:, 1]
-    result.init_mz = init_m[:, 2]
-    result.init_rx = init_r[:, 0]
-    result.init_ry = init_r[:, 1]
-    result.init_rz = init_r[:, 2]
-
-    return result
+def load_initial_conditions(filename, device="cpu"):
+    """
+    Loads initial conditions from a CSV file and returns a PyTorch tensor.
+    """
+    df = pd.read_csv(filename)
+    
+    # Extract the initial conditions columns and convert to a NumPy array
+    init_m = df[['init_mx', 'init_my', 'init_mz']].values
+    init_r = df[['init_rx', 'init_ry', 'init_rz']].values
+    
+    # Concatenate and convert to a PyTorch tensor
+    initial_conditions = torch.tensor(
+        np.concatenate([init_m, init_r], axis=1), 
+        dtype=torch.float32, 
+        device=device
+    )
+    
+    print(f"Loaded {len(initial_conditions)} initial conditions from: {filename}")
+    return initial_conditions
     
 
 def simulate_normal(args):
@@ -128,6 +140,25 @@ def simulate_soft(args):
     """
     return simulate.simulate(args, method = "soft")
 
+def split_into_batches(data, batch_size):
+    return [data[i:i+batch_size] for i in range(0, len(data), batch_size)]
+
+def simulate_batch_normal(batch_initial_conditions_and_args):
+    args, initial_conditions_batch = batch_initial_conditions_and_args
+    return simulate.simulate_batch(args, initial_conditions_batch, method="normal")
+
+def simulate_batch_implicit(batch_initial_conditions_and_args):
+    args, initial_conditions_batch = batch_initial_conditions_and_args
+    return simulate.simulate_batch(args, initial_conditions_batch, method="implicit")
+
+def simulate_batch_soft(batch_initial_conditions_and_args):
+    args, initial_conditions_batch = batch_initial_conditions_and_args
+    return simulate.simulate_batch(args, initial_conditions_batch, method="soft")
+
+def simulate_batch_without(batch_initial_conditions_and_args):
+    args, initial_conditions_batch = batch_initial_conditions_and_args
+    return simulate.simulate_batch(args, initial_conditions_batch, method="without")
+
 def run_simulation(sim_func, argss, use_multiprocessing):
     if use_multiprocessing:
         ctx = mp.get_context('spawn')
@@ -147,15 +178,29 @@ def generate_trajectories(args):
         print("Generating dataset.")
         #Now we generage initial conditions (deterministic)
         np.random.seed(args.seed)
+
         # args = generate_initial_conditions(args) #update args with random initial conditions
-        argss = [update_args_init(args) for _ in range(args.points)]
+        # argss = [update_args_init(args) for _ in range(args.points)]
         """if args.multiprocessing:
             pool = mp.Pool(mp.cpu_count())
             dfs =  pool.map(simulate_normal, argss)
             pool.close()
         else:
             dfs = [simulate_normal(args) for args in argss]"""
-        dfs = run_simulation(simulate_normal, argss, args.multiprocessing)
+        # dfs = run_simulation(simulate_normal, argss, args.multiprocessing)
+
+        initial_conditions = generate_initial_conditions(args, device=args.device)
+        # initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_generate.csv", device=args.device)
+        
+        initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
+        batched_inputs = [(args, batch) for batch in initial_condition_batches]
+
+        if args.multiprocessing:
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                dfs = pool.map(simulate_batch_normal, batched_inputs)
+        else:
+            dfs = [simulate_batch_normal(x) for x in batched_inputs]
 
         #save
         print("Saving dataset")
@@ -178,7 +223,7 @@ def generate_trajectories(args):
         print("-------------------------------")
 
         #generating initial conditions
-        argss = [update_args_init(args) for _ in range(args.points)]
+        # argss = [update_args_init(args) for _ in range(args.points)]
 
         #GT
         print("Generating GT.")
@@ -188,23 +233,52 @@ def generate_trajectories(args):
             pool.close()
         else:
             dfs = [simulate_normal(args) for args in argss]"""
-        dfs = run_simulation(simulate_normal, argss, multiprocessing)
+        # dfs = run_simulation(simulate_normal, argss, multiprocessing)
+
+        initial_conditions = generate_initial_conditions(args, device=args.device)
+        #initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_test.csv", device=args.device)
+
+        initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
+ 
+        batched_inputs = [(args, batch) for batch in initial_condition_batches]
+
+        if args.multiprocessing:
+            ctx = mp.get_context('spawn')
+            with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                dfs = pool.map(simulate_batch_normal, batched_inputs)
+        else:
+            dfs = [simulate_batch_normal(x) for x in batched_inputs]
 
         total_generalization_data_frame = pd.concat(dfs, ignore_index=True)
 
         if args.implicit:
             print("Simulating with learned implicit.")
-            dfs = run_simulation(simulate_implicit, argss, multiprocessing)
+            if args.multiprocessing:
+                ctx = mp.get_context('spawn')
+                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                    dfs = pool.map(simulate_batch_implicit, batched_inputs)
+            else:
+                dfs = [simulate_batch_implicit(x) for x in batched_inputs]
             total_implicit_data_frame = pd.concat(dfs, ignore_index=True)
 
         if args.soft:
             print("Simulating with learned soft.")
-            dfs = run_simulation(simulate_soft, argss, multiprocessing)
+            if args.multiprocessing:
+                ctx = mp.get_context('spawn')
+                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                    dfs = pool.map(simulate_batch_soft, batched_inputs)
+            else:
+                dfs = [simulate_batch_soft(x) for x in batched_inputs]
             total_soft_data_frame = pd.concat(dfs, ignore_index=True)
 
         if args.without:
             print("Simulating with learned without.")
-            dfs = run_simulation(simulate_without, argss, multiprocessing)
+            if args.multiprocessing:
+                ctx = mp.get_context('spawn')
+                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                    dfs = pool.map(simulate_batch_without, batched_inputs)
+            else:
+                dfs = [simulate_batch_without(x) for x in batched_inputs]
             total_without_data_frame = pd.concat(dfs, ignore_index=True)
 
         #    %if (args.points >= 10) and ((i % int(round(args.points/10))) == 0):
@@ -219,7 +293,7 @@ def generate_trajectories(args):
             simulate.save_simulation(total_without_data_frame, args.folder_name+"/data/learned_without.xyz") 
         simulate.save_simulation(total_generalization_data_frame, args.folder_name+"/data/generalization.xyz")
 
-    # won't use
+    # not used
     """else:  # simulating with the learned models
         total_implicit_data_frame = None
         total_soft_data_frame = None
@@ -353,9 +427,9 @@ def resolve_automatic_dt(args):
         p = math.sqrt(args.init_mx**2+args.init_my**2+args.init_mz**2)
         m = r*p
         e = args.M*args.alpha**2/(2*m**2)
-        omega = 2/(args.alpha*math.sqrt(args.M/(2*e**3)))
+        omega = 2/(args.alpha*math.sqrt(args.M/(2*e**3)))*2 # increased for stability
     elif args.model == "Sh": #Shivamoggi
-        omega = 2*math.pi
+        omega = 2*math.pi*2 # increased for stability
     else:
         raise Exception("Unkonown model.")
     dt = 0.01 * 2*math.pi/omega
@@ -371,7 +445,7 @@ if __name__ == "__main__":
     #Parse arguments
     #Typical usage: python3 comparison.py --generate --steps=100 --implicit --soft --without
     parser = argparse.ArgumentParser()
-    parser.add_argument("--scheme", default="IMR", type=str, help="Numerical scheme. FE forward euler, BE backward euler, CN Crank-Nicholson")
+    parser.add_argument("--scheme", default="IMR", type=str, help="Numerical scheme. FE forward euler, BE backward euler, CN Crank-Nicholson, Eh Ehrenfest")
     parser.add_argument("--model", default="RB", type=str, help="Model: RB, HT, P3D, K3D, or P2D.")
     parser.add_argument("--steps", default=200, type=int, help="Number of simulation steps")
     parser.add_argument("--init_mx", default=10.0, type=float, help="A value of momentum, x component")
@@ -412,7 +486,7 @@ if __name__ == "__main__":
     parser.add_argument("--quad_features", default=False, action="store_true", help="Adds quadratic features")
     parser.add_argument("--M_tau", default=0, type=float, help="Multiple of dt used for energy regularisation for training dataset and GT.")
     parser.add_argument("--multiprocessing", default=False, action="store_true", help="Use multiprocessing for simulation.")
-    parser.add_argument("--simulate_cuda", default=False, action="store_true", help="Use CUDA for simulation.")
+    parser.add_argument("--simulation_batch_size", default=256, type=int, help="Batch size for simulation.")
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
@@ -428,6 +502,22 @@ if __name__ == "__main__":
         print(args)
         sys.stdout = original_stdout
 
+    if args.implicit and args.model in ["HT", "P3D", "K3D", "P2D", "Sh"]:
+        raise Exception(f"Implicit solver not yet implemented for {args.model}.")
+    
+    if args.model == "K3D" and args.scheme != "IMR":
+        raise Exception("Don't use CN for Kepler.")
+
+    if args.model == "P2D" and args.scheme != "IMR":
+        raise Exception("Not implemented.")
+
+    if args.cuda and torch.cuda.is_available():
+        args.device = torch.device("cuda")
+        print(f"Using GPU: {torch.cuda.get_device_name()}")
+    else:
+        args.device = torch.device("cpu")
+        print("Using CPU")
+
     if args.generate:
         print("-------------------------------")
         print("Generating trajectories.")    
@@ -442,16 +532,16 @@ if __name__ == "__main__":
         print("-------------------------------")
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                 dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features)
-        if args.scheme == "RK4":
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+        elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                 dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                              dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                              dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         learner.learn(method = "implicit", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     if args.soft:
         print("-------------------------------")
@@ -459,12 +549,16 @@ if __name__ == "__main__":
         print("-------------------------------")
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                 dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+        elif args.scheme == "RK4":
+            learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                              dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                              dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         learner.learn(method = "soft", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor, jac_prefactor = args.jac_prefactor)
     if args.without:
         print("-------------------------------")
@@ -472,12 +566,16 @@ if __name__ == "__main__":
         print("-------------------------------")
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                 dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+        elif args.scheme == "RK4":
+            learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
+                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                              dt = args.dt, name = args.folder_name, cuda = args.cuda, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features)
+                              dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
         learner.learn(method = "without", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     if not args.no_show:
         plot_training_errors(args)

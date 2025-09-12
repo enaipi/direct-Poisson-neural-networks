@@ -26,9 +26,9 @@ class TrajectoryDataset(Dataset):
 
         mid = 0.5 * (features + targets)
         
-        self.features = torch.from_numpy(features.astype(np.float32))
-        self.targets = torch.from_numpy(targets.astype(np.float32))
-        self.mid = torch.from_numpy(mid.astype(np.float32))
+        self.features = torch.from_numpy(features)
+        self.targets = torch.from_numpy(targets)
+        self.mid = torch.from_numpy(mid)
         
         if device is not None:
             self.features = self.features.to(device)
