@@ -100,45 +100,7 @@ def load_initial_conditions(filename, device="cpu"):
     
     print(f"Loaded {len(initial_conditions)} initial conditions from: {filename}")
     return initial_conditions
-    
 
-def simulate_normal(args):
-    """
-    The function `simulate_normal` calls the `simulate` function with the method parameter set to
-    "normal".
-    
-    :param args: The `args` parameter is a dictionary that contains the necessary arguments for the simulation. The specific contents of the `args` dictionary will depend on the requirements of the `simulate` function
-    :return: The function `simulate_normal` is returning the result of calling the `simulate` function with the given arguments and the method set to "normal".
-    """
-    return simulate.simulate(args, method = "normal") 
-
-def simulate_implicit(args):
-    """
-    The function `simulate_implicit` calls the `simulate` function with the method parameter set to
-    "implicit".
-    
-    :param args: The `args` parameter is a dictionary that contains the necessary arguments for the simulation. The specific contents of the `args` dictionary will depend on the requirements of the `simulate` function
-    :return: The function `simulate_implicit` is returning the result of calling the `simulate` function with the given arguments and the method set to "implicit".
-    """
-    return simulate.simulate(args, method = "implicit") 
-
-def simulate_without(args):
-    """
-    The function "simulate_without" calls the "simulate" function with the argument "method" set to "without".
-    
-    :param args: The `args` parameter is a placeholder for any additional arguments that need to be passed to the `simulate` function. These arguments can vary depending on the specific requirements of the `simulate` function
-    :return: The function `simulate_without` is returning the result of calling the `simulate` function with the provided arguments and the method set to "without".
-    """
-    return simulate.simulate(args, method = "without") 
-
-def simulate_soft(args):
-    """
-    The function `simulate_soft` calls the `simulate` function with the argument `method` set to "soft".
-    
-    :param args: The `args` parameter is a dictionary or a list of arguments that will be passed to the `simulate` function. The specific arguments required will depend on the implementation of the `simulate` function
-    :return: The function `simulate_soft` is returning the result of calling the `simulate` function with the given arguments and the method set to "soft".
-    """
-    return simulate.simulate(args, method = "soft")
 
 def split_into_batches(data, batch_size):
     return [data[i:i+batch_size] for i in range(0, len(data), batch_size)]
@@ -204,7 +166,7 @@ def generate_trajectories(args):
 
         #save
         print("Saving dataset")
-        total_data_frame = pd.concat(dfs, ignore_index=True)
+        total_data_frame = pd.concat(dfs, ignore_index=False)
         #save to file
         simulate.save_simulation(total_data_frame, args.folder_name+"/"+DEFAULT_dataset)
         print("Generated trajectories saved to: ", args.folder_name+"/"+DEFAULT_dataset)
@@ -427,7 +389,7 @@ def resolve_automatic_dt(args):
         p = math.sqrt(args.init_mx**2+args.init_my**2+args.init_mz**2)
         m = r*p
         e = args.M*args.alpha**2/(2*m**2)
-        omega = 2/(args.alpha*math.sqrt(args.M/(2*e**3)))*2 # increased for stability
+        omega = 2/(args.alpha*math.sqrt(args.M/(2*e**3))) # increased for stability
     elif args.model == "Sh": #Shivamoggi
         omega = 2*math.pi*2 # increased for stability
     else:
@@ -487,6 +449,7 @@ if __name__ == "__main__":
     parser.add_argument("--M_tau", default=0, type=float, help="Multiple of dt used for energy regularisation for training dataset and GT.")
     parser.add_argument("--multiprocessing", default=False, action="store_true", help="Use multiprocessing for simulation.")
     parser.add_argument("--simulation_batch_size", default=256, type=int, help="Batch size for simulation.")
+    parser.add_argument("--no_data_to_gpu", default=True, action="store_false", help="Move data to GPU for simulation.")
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
@@ -516,6 +479,7 @@ if __name__ == "__main__":
         print(f"Using GPU: {torch.cuda.get_device_name()}")
     else:
         args.device = torch.device("cpu")
+        args.no_data_to_gpu = False
         print("Using CPU")
 
     if args.generate:
@@ -533,15 +497,18 @@ if __name__ == "__main__":
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                               dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                              simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         learner.learn(method = "implicit", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     if args.soft:
         print("-------------------------------")
@@ -550,15 +517,18 @@ if __name__ == "__main__":
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                               dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                              simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         learner.learn(method = "soft", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor, jac_prefactor = args.jac_prefactor)
     if args.without:
         print("-------------------------------")
@@ -567,15 +537,18 @@ if __name__ == "__main__":
         if args.scheme == "IMR":
             learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                  dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                               dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                              dropout_rate = args.dropout_rate, quad_features=args.quad_features, simulation_batch_size=args.simulation_batch_size)
+                              dropout_rate = args.dropout_rate, quad_features=args.quad_features,
+                              simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu)
         learner.learn(method = "without", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     if not args.no_show:
         plot_training_errors(args)

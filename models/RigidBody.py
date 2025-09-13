@@ -253,7 +253,7 @@ class RigidBody(object): #Parent Rigid body class
         return self.energy()
 
 class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a from https://doi.org/10.1016/j.physd.2019.06.006, τ=dt
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for the RBEhrenfest class, which is a subclass of another
         class.
@@ -298,7 +298,7 @@ class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a fro
 
 
 class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for a class called RBESeReCN, which is a subclass of another
         class.
@@ -348,25 +348,6 @@ class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
         res = mOld - mNew + self.dt/2*(ham + hamNew) #+ self.dt*self.tau/4*(reg + regNew)
 
         return (res[0], res[1], res[2])
-
-    # not used
-    """def m_new(self, with_entropy = False): #return new m and update RB
-        ""
-        The function `m_new` calculates and returns new values for `mx`, `my`, and `mz`, and updates the
-        corresponding variables in the class instance.
-        
-        :param with_entropy: The "with_entropy" parameter is a boolean flag that determines whether or not to include entropy in the calculation of the new angular momentum. If set to True, entropy will be considered in the calculation. If set to False, entropy will not be considered, defaults to False (optional)
-        :return: the updated values of mx, my, and mz as a tuple.
-        ""
-        #calculate
-        m_new = fsolve(self.f, (self.mx, self.my, self.mz))
-
-        #update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
-
-        return m_new"""
     
     def _hamiltonian(self, m):
         dot = (self.d2E @ m.T).T
@@ -411,7 +392,7 @@ class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
         return m_new
 
 class RBIMR(RigidBody):#implicit midpoint
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, device="cpu"):
         """
         The function initializes an instance of the RBIMR class with given parameters.
         
@@ -498,7 +479,7 @@ class RBIMR(RigidBody):#implicit midpoint
 
 
 class RBRK4(RigidBody):
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, tau, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, tau, device="cpu"):
         """
         The function initializes an instance of the RBRK4 class with given parameters.
         
@@ -550,7 +531,7 @@ class RBRK4(RigidBody):
 
 
 class RBESeReFE(RigidBody):#SeRe forward Euler
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for a class called RBESeReFE, which is a subclass of another
         class.
@@ -576,21 +557,16 @@ class RBESeReFE(RigidBody):#SeRe forward Euler
         :param with_entropy: A boolean parameter that determines whether or not to calculate the new entropy using explicit forward Euler. If set to True, the entropy will be calculated and updated. If set to False, the entropy will not be calculated, defaults to False (optional)
         :return: the updated value of the angular momentum vector, `m`.
         """
-
-        #Construct mOld
         mOld = torch.stack([self.mx, self.my, self.mz], dim=1)
         
-        #calculate
         dot = (self.d2E @ mOld.T).T
         ham = torch.cross(mOld, dot, dim=1)
 
-        #regularized part t
         dotR = (self.d2E @ ham.T).T
         reg = torch.cross(dotR, mOld, dim=1)
 
         m = mOld + self.dt*ham - self.dt*self.tau/2*reg
 
-        #update
         self.mx = m[:, 0]
         self.my = m[:, 1]
         self.mz = m[:, 2]
@@ -741,26 +717,6 @@ class Neural(RigidBody):#SeRe forward Euler
         # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         E = self.energy_net(z)
         return E
-
-    # not used
-    # original implementation of m_new
-    """def m_new(self, with_entropy = False): #return new m and update RB
-        ""
-        The function `m_new` calculates new values for `mx`, `my`, and `mz` using the `fsolve` function and
-        updates the corresponding variables.
-        
-        :param with_entropy: The parameter "with_entropy" is a boolean flag that determines whether or not to include entropy in the calculation of the new value of m. If it is set to True, entropy will be considered in the calculation. If it is set to False, entropy will not be considered, defaults to False (optional)
-        :return: the updated values of mx, my, and mz as a tuple.
-        ""
-        #calculate
-        m_new = fsolve(self.f, (self.mx, self.my, self.mz))
-
-        # update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
-
-        return m_new"""
     
     def _hamiltonian(self, z_tensor):
         z_tensor.requires_grad_(True)
@@ -897,7 +853,7 @@ class RBNeuralIMR(Neural):#implicit midpoint rule
 
 
 class HeavyTopCN(RigidBody): #Crank-Nicolson
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz, device):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz, device="cpu"):
         """
         The function initializes the HeavyTopCN class with given parameters. CN stands for the Crank-Nicholson method.
         
@@ -995,26 +951,6 @@ class HeavyTopCN(RigidBody): #Crank-Nicolson
         r_res = r_old - r_new + (self.dt / 2) * (r_m_old + r_m_new)
 
         return np.concat((m_res, r_res))
-
-    # not used
-    """def m_new(self, with_entropy = False): #return new m and update RB
-        ""
-        The function `m_new` calculates new values for `mx`, `my`, `mz`, and `r` using the `fsolve` function
-        and returns the updated values.
-        
-        :param with_entropy: The parameter "with_entropy" is a boolean flag that determines whether or not to include entropy in the calculation. If it is set to True, entropy will be included in the calculation. If it is set to False, entropy will not be included, defaults to False (optional)
-        :return: a tuple containing the updated values of (self.mx, self.my, self.mz) and self.r.
-        ""
-        #calculate
-        (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]) = fsolve(self.f, (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]))
-
-        #update
-        #self.mx = m_new[0]
-        #self.my = m_new[1]
-        #self.mz = m_new[2]
-        #self.r = r_new
-
-        return ((self.mx, self.my, self.mz), self.r)"""
     
     def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
         m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
@@ -1104,7 +1040,6 @@ class HeavyTopIMR(HeavyTopCN): #implicit midpoint rule
         m_res = m_old - m_new + self.dt*(m_ham + m_r)
         r_res = r_old - r_new + self.dt*r_m 
 
-        #return (res[0], res[1], res[2]) 
         return np.concat((m_res, r_res))
 
     def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
@@ -1162,7 +1097,7 @@ class HeavyTopIMR(HeavyTopCN): #implicit midpoint rule
 
 
 class HeavyTopNeural(HeavyTopCN):
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, device, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a HeavyTopNeural object with specified parameters and loads a neural
         network model based on the chosen method.
@@ -1293,26 +1228,6 @@ class HeavyTopNeural(HeavyTopCN):
         # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         E = self.energy_net(z)
         return E
-
-    #@tf.function
-    """def m_new(self, with_entropy = False): #return new m and update RB
-        ""
-        The function `m_new` calculates new values for `mx`, `my`, `mz`, and `r` based on the current values
-        and returns the updated values.
-        
-        :param with_entropy: The `with_entropy` parameter is a boolean flag that determines whether or not to include entropy in the calculation. If `with_entropy` is set to `True`, entropy will be included in the calculation. If `with_entropy` is set to `False` (default), entropy will not be included, defaults to False (optional)
-        :return: The function `m_new` returns a tuple containing the updated values of `mx`, `my`, `mz` (momefield components) and `r` (position vector).
-        ""
-        #calculate
-        mr_new = fsolve(self.f, (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]))
-
-        # update
-        self.mx = mr_new[0]
-        self.my = mr_new[1]
-        self.mz = mr_new[2]
-        self.r = [mr_new[3], mr_new[4], mr_new[5]]
-
-        return ((self.mx, self.my, self.mz), self.r)"""
     
     def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
         mr_old = torch.stack([self.mx, self.my, self.mz, self.rx, self.ry, self.rz], dim=1)
@@ -1423,7 +1338,7 @@ class HeavyTopNeuralIMR(HeavyTopNeural):
         return mr[:, :3], mr[:, 3:]
 
 class Particle3DCN(object): #Crank-Nicolson
-    def __init__(self, M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device):
+    def __init__(self, M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my,
         and init_mz.
@@ -1465,13 +1380,6 @@ class Particle3DCN(object): #Crank-Nicolson
         :param m: The parameter `m` is a tuple with three elements representing the x, y, and z coordinates respectively. The default value for `m` is (0.0, 0.0, 0.0)
         :return: The function `get_L` returns a 6x6 numpy array `L` with the following values:
         """
-        """L = np.array([
-            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, -1.0, 0.0, 0.0, 0.0]])"""
         B = m.shape[0]
         zeros = torch.zeros((B,), dtype=m.dtype, device=m.device)
         ones  = torch.ones((B,), dtype=m.dtype, device=m.device)
@@ -1549,28 +1457,6 @@ class Particle3DCN(object): #Crank-Nicolson
 
         self.r = rp_new[:, 0:3]
         self.p = rp_new[:, 3:6]
-
-        """#calculate
-        #(self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]) = fsolve(self.f, (self.r[0], self.r[0], self.r[0], self.p[0], self.p[1], self.p[2]))
-        (rx, ry, rz, px, py, pz) = fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
-        self.r[0] = rx
-        self.r[1] = ry
-        self.r[2] = rz
-        self.p[0] = px
-        self.p[1] = py
-        self.p[2] = pz
-        #forward Euler:
-        #rpOld = np.concatenate([self.r, self.p])
-        #dEOld = np.concatenate([self.p/self.M, self.alpha*self.r])
-        #print("deOld = ", dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(np.ones(6))
-        #self.r = rp[0:3]
-        #self.p = rp[3:6]
-        #print(self.r)
-        #print(self.p)
-
-        return ((rx, ry, rz), (px, py, pz))"""
         
         return rp_new[:, 0:3], rp_new[:, 3:6]
 
@@ -1628,33 +1514,11 @@ class Particle3DIMR(Particle3DCN):
 
         self.r = rp_new[:, 0:3]
         self.p = rp_new[:, 3:6]
-
-        """#calculate
-        #(self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]) = fsolve(self.f, (self.r[0], self.r[0], self.r[0], self.p[0], self.p[1], self.p[2]))
-        (rx, ry, rz, px, py, pz) = fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
-        self.r[0] = rx
-        self.r[1] = ry
-        self.r[2] = rz
-        self.p[0] = px
-        self.p[1] = py
-        self.p[2] = pz
-        #forward Euler:
-        #rpOld = np.concatenate([self.r, self.p])
-        #dEOld = np.concatenate([self.p/self.M, self.alpha*self.r])
-        #print("deOld = ", dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(np.ones(6))
-        #self.r = rp[0:3]
-        #self.p = rp[3:6]
-        #print(self.r)
-        #print(self.p)
-
-        return ((rx, ry, rz), (px, py, pz))"""
         
         return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DNeural(Particle3DCN):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry,  init_rz, init_mx, init_my, init_mz, device, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry,  init_rz, init_mx, init_my, init_mz, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a Particle3DNeural object with specified parameters and loads a neural
         network based on the chosen method.
@@ -1827,17 +1691,9 @@ class Particle3DNeural(Particle3DCN):
                     rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
                     rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
 
-        #calculate
-        #(self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2])= fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
-
-        # update
-        #self.r = rpNew[0:3]
-        #self.p = rpNew[3:5]
-
         self.r = rp_new[:, 0:3]
         self.p = rp_new[:, 3:6]
 
-        #return ((self.r[0], self.r[1], self.r[2]), (self.p[0], self.p[1], self.p[2]))
         return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DNeuralIMR(Particle3DNeural):
@@ -1899,17 +1755,9 @@ class Particle3DNeuralIMR(Particle3DNeural):
                     rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
                     rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
 
-        #calculate
-        #(self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2])= fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
-
-        # update
-        #self.r = rpNew[0:3]
-        #self.p = rpNew[3:5]
-
         self.r = rp_new[:, 0:3]
         self.p = rp_new[:, 3:6]
 
-        #return ((self.r[0], self.r[1], self.r[2]), (self.p[0], self.p[1], self.p[2]))
         return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DKeplerIMR(Particle3DIMR):
@@ -1976,7 +1824,7 @@ class Particle3DKeplerIMR(Particle3DIMR):
         return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle2DIMR(object): #Implicit midpont rule
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_mx, init_my, and zeta.
         
@@ -1990,9 +1838,7 @@ class Particle2DIMR(object): #Implicit midpont rule
         :param zeta: The parameter zeta represents the damping coefficient in the system. It determines the rate at which the system loses energy due to damping. A higher value of zeta leads to faster energy dissipation and damping of the system.
         """
         self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
-        #self.r = np.array((init_rx, init_ry))
         self.r = torch.stack([init_rx, init_ry], dim=1)
-        #self.p = np.array((init_mx, init_my))
         self.p = torch.stack([init_mx, init_my], dim=1)
         self.alpha = alpha
         self.dt = dt
@@ -2015,11 +1861,6 @@ class Particle2DIMR(object): #Implicit midpont rule
         :param m: The parameter `m` is a tuple with three elements representing the x, y, and z coordinates respectively. The default value for `m` is (0.0, 0.0, 0.0)
         :return: a 4x4 numpy array called L.
         """
-        """L = np.array([
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-            [-1.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0]])"""
         B = m.shape[0]
         
         zeros = torch.zeros((B,), dtype=m.dtype, device=m.device)
@@ -2086,20 +1927,13 @@ class Particle2DIMR(object): #Implicit midpont rule
                     rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
                     rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
 
-        """(rx, ry, px, py) = fsolve(self.f, (self.r[0], self.r[1], self.p[0], self.p[1]))
-        self.r[0] = rx
-        self.r[1] = ry
-        self.p[0] = px
-        self.p[1] = py
-        return ((rx, ry), (px, py))"""
-
         self.r = rp_new[:, 0:2]
         self.p = rp_new[:, 2:4]
 
         return rp_new[:, 0:2], rp_new[:, 2:4]
 
 class Particle2DNeural(Particle2DIMR):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a Particle2DNeural object with specified parameters and loads a neural
         network based on the chosen method.
@@ -2188,9 +2022,6 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this tensor during backprop
         :return: The function `get_cass` returns the value of `cass` as a NumPy array.
         """
-        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
-        # J, cass = self.J_net(z_tensor)
-        # return cass.detach().cpu().numpy()
         J, cass = self.J_net(z)
         return cass
 
@@ -2202,9 +2033,6 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. 
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
-        #L = self.L_net(z_tensor).detach().cpu().numpy()[0]
-        #return L
         L = self.L_net(z)
         return L
 
@@ -2216,9 +2044,6 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
-        #E = self.energy_net(z_tensor).detach().cpu().numpy()[0]
-        #return E
         E = self.energy_net(z)
         return E
 
@@ -2261,11 +2086,6 @@ class Particle2DNeural(Particle2DIMR):
                     rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
                     rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
 
-        """#calculate
-        (self.r[0], self.r[1], self.p[0], self.p[1])= fsolve(self.f, (self.r[0], self.r[1], self.p[0], self.p[1]))
-
-        return ((self.r[0], self.r[1]), (self.p[0], self.p[1]))"""
-
         self.r = rp_new[:, 0:2]
         self.p = rp_new[:, 2:4]
 
@@ -2273,7 +2093,7 @@ class Particle2DNeural(Particle2DIMR):
 
 
 class ShivamoggiIMR(object):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, and init_u.
         
@@ -2406,7 +2226,7 @@ class ShivamoggiIMR(object):
         self.u = um_new[:, 0]
         self.x = um_new[:, 1:4]
 
-        return um_new"""
+        return um_new
     
     def f_torch(self, mNew, mOld):
         m_mid = 0.5 * (mNew + mOld)
@@ -2448,7 +2268,7 @@ class ShivamoggiIMR(object):
         self.u = um_new[:, 0]
         self.x = um_new[:, 1:4]
 
-        return um_new
+        return um_new"""
     
     def _mdot(self, m):
         return torch.stack([
@@ -2542,96 +2362,9 @@ class ShivamoggiIMR(object):
         
         return um_new.detach()
 
-"""
-class ShivamoggiIMR(object):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device):
-        ""
-        The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, and init_u.
-        
-        :param M: The parameter M represents the mass of the system. It is used in the Hamiltonian equation to calculate the kinetic energy term, which is given by 1/2 p^2/M, where p is the momentum of the system
-        :param dt: dt is the time step size used in numerical integration methods to update the system's state. It determines the granularity of the simulation and affects the accuracy and stability of the calculations. Smaller values of dt result in more accurate but slower simulations, while larger values of dt can lead to faster but less accurate
-        :param alpha: A parameter in the Shivamoggi equations
-        :param init_rx: The initial x-coordinate of the particle's position
-        :param init_ry: The parameter `init_ry` represents the initial value of the y-coordinate of the position vector
-        :param init_rz: The parameter `init_rz` represents the initial value of the z-coordinate of the position vector
-        :param init_u: The `init_u` parameter represents the initial momentum of the system. It is a vector that specifies the initial momentum in each direction (x, y, z)
-        ""
-        self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
-        self.u = init_u
-        self.x = np.array((init_rx, init_ry, init_rz))
-        self.alpha = alpha
-        self.dt = dt
-        self.device = device
-
-    def get_E(self, m):
-        ""
-        The function `get_E` calculates the value of E using the formula E = m[3]**2 + m[0]**2 - m[2]**2.
-        
-        :param m: The parameter `m` is a list or tuple containing four elements
-        :return: the value of m[3]**2 + m[0]**2 - m[2]**2.
-        ""
-        return m[3]**2 + m[0]**2 - m[2]**2
-
-    def get_UV(self, m):
-        ""
-        The function `get_UV` takes a list `m` as input and returns a tuple of two tuples, where the first
-        tuple is calculated based on the values of `u`, `x`, and `z` from `m`, and the second tuple is
-        calculated based on the value of `x` and `z` from `m`.
-        
-        :param m: The parameter `m` is a list containing four elements: `u`, `x`, `y`, and `z`
-        :return: The function `get_UV` returns a tuple of two tuples. The first tuple contains three values: 0.0, 2*u*(x+z), and 0.0. The second tuple contains three values: x, 0, and -z.
-        ""
-        u = m[0]
-        x = m[1]
-        y = m[2]
-        z = m[3]
-        return (0.0, 2*u*(x+z), 0.0), (x, 0, -z)
-
-    def get_L(self, m = (0.0, 0.0, 0.0, 0.0)):
-        ""
-        The function `get_L` calculates and returns a 4x4 matrix L based on the input parameter m.
-        
-        :param m: The parameter `m` is a tuple of four values `(m[0], m[1], m[2], m[3])`
-        :return: The function `get_L` returns a 4x4 numpy array.
-        ""
-        U, V = self.get_UV(m)
-        L = np.array([
-            [0.0, -U[0], -U[1], -U[2]],
-            [U[0], 0.0, -V[2], V[1]],
-            [U[1], V[2], 0.0, -V[0]],
-            [U[2], -V[1], V[0], 0.0]])/(m[0]+m[3])
-        return L
-
-    def f(self, mNew):#defines the function f zero of which is sought
-        ""
-        The function `f` calculates the residual of a given input `mNew` by performing a series of
-        mathematical operations.
-        
-        :param mNew: The parameter `mNew` is a list or array containing the new values for `u`, `x[0]`, `x[1]`, and `x[2]`
-        :return: a tuple containing the values of mres[0], mres[1], mres[2], and mres[3].
-        ""
-        mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
-        m_mid = 0.5*(np.array(mNew)+mOld)
-        mdot = np.array([-m_mid[0]*m_mid[2], m_mid[3]*m_mid[2], m_mid[3]*m_mid[1]-m_mid[0]**2, m_mid[1]*m_mid[2]])
-
-        mres = mOld-mNew + self.dt*mdot
-        return (mres[0], mres[1], mres[2], mres[3]) 
-
-    def m_new(self): #return new r and p
-        ""
-        The function `m_new` returns new values for `u`, `x[0]`, `x[1]`, and `x[2]` by solving the equation
-        `f(u, x[0], x[1], x[2]) = 0` using the `fsolve` function.
-        :return: a tuple containing the values of u, x, y, and z.
-        ""
-        (u, x, y, z) = fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
-        self.u = u
-        self.x[0] = x
-        self.x[1] = y
-        self.x[2] = z
-        return (u, x, y, z)"""
 
 class ShivamoggiNeural(ShivamoggiIMR):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a ShivamoggiNeural object with specified parameters and loads the
         appropriate neural network models based on the chosen method.
@@ -2754,7 +2487,7 @@ class ShivamoggiNeural(ShivamoggiIMR):
         E = self.energy_net(z)
         return E
 
-    def m_new(self, solver_iterations=300, tol=1e-7): #return new r and p
+    def m_new(self, solver_iterations=300, tol=5e-6): #return new r and p
         """
         The function `m_new` returns the values of `u`, `x[0]`, `x[1]`, and `x[2]` after solving the
         equation `f` using the `fsolve` function.
@@ -2796,7 +2529,4 @@ class ShivamoggiNeural(ShivamoggiIMR):
         self.u = um_new[:, 0]
         self.x = um_new[:, 1:4]
 
-        """(self.u, self.x[0], self.x[1], self.x[2])= fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
-
-        return (self.u, self.x[0], self.x[1], self.x[2])"""
         return um_new

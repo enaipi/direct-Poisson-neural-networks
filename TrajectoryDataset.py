@@ -5,7 +5,7 @@ import torch
 class TrajectoryDataset(Dataset):
     """TRAJECTORY DATASET"""
 
-    def __init__(self, dataframe, model = "RB", device=None):
+    def __init__(self, dataframe, model = "RB", device=None, no_data_to_gpu=True):
         if model == "RB":
             features = np.vstack((dataframe["old_mx"], dataframe["old_my"], dataframe["old_mz"])).transpose()
             targets  = np.vstack((dataframe["mx"], dataframe["my"], dataframe["mz"])).transpose()
@@ -30,7 +30,7 @@ class TrajectoryDataset(Dataset):
         self.targets = torch.from_numpy(targets)
         self.mid = torch.from_numpy(mid)
         
-        if device is not None:
+        if no_data_to_gpu and device is not None and device.type == 'cuda':
             self.features = self.features.to(device)
             self.targets = self.targets.to(device)
             self.mid = self.mid.to(device)

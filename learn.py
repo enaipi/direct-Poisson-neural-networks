@@ -33,7 +33,7 @@ class Learner(object):
     This is the fundamental class that provides the capability to learn dynamical systems, 
     using various methods of learning (without Jacobi identity, with softly enforced Jacobi, and with implicitly valid Jacobi).
     """
-    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0, quad_features=False):   # added dropout parameter
+    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0, quad_features=False, no_data_to_gpu=True):   # added dropout parameter
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -62,6 +62,8 @@ class Learner(object):
 
         self.dissipative = dissipative
 
+        self.no_data_to_gpu = no_data_to_gpu
+
         #self.logdir = os.path.join("logs", "{}-{}-{}".format(
         #    os.path.basename(globals().get("__file__", "notebook")),
         #    datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
@@ -83,8 +85,8 @@ class Learner(object):
         # self.dispot = self.dispot.to(self.device)
 
         self.train, self.test = train_test_split(self.df, test_size=0.4)
-        self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device)
-        self.valid_dataset = TrajectoryDataset(self.test, model = model, device=self.device)
+        self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
+        self.valid_dataset = TrajectoryDataset(self.test, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
 
         self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
         self.valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=True)
@@ -252,10 +254,10 @@ class Learner(object):
                 #print("zn2 = ", zn2_tensor)
                 # zero the parameter gradients
 
-                """if self.device != None:
+                if self.no_data_to_gpu == False:
                     zn_tensor = zn_tensor.to(self.device)
                     zn2_tensor = zn2_tensor.to(self.device)
-                    mid_tensor = mid_tensor.to(self.device)"""
+                    mid_tensor = mid_tensor.to(self.device)
                     
                 optimizer.zero_grad()
                 zn_tensor.requires_grad = True
@@ -297,7 +299,7 @@ class Learner(object):
                             "Training loss (for one batch) at step %d: movement %.4f "
                             % (step, float(mov_value))
                         )
-                    print("Seen so far: %s samples" % ((step + 1) * 64))
+                    #print("Seen so far: %s samples" % ((step + 1) * 64))
 
 
             # Display metrics at the end of each epoch.
@@ -316,10 +318,10 @@ class Learner(object):
             jacobi_loss = None
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
 
-                """if self.device != None:
+                if self.no_data_to_gpu == False:
                     zn_tensor = zn_tensor.to(self.device)
                     zn2_tensor = zn2_tensor.to(self.device)
-                    mid_tensor = mid_tensor.to(self.device)"""
+                    mid_tensor = mid_tensor.to(self.device)
 
                 zn_tensor.requires_grad = True
                 zn2_tensor.requires_grad = True

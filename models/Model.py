@@ -22,19 +22,19 @@ class EnergyNet(nn.Module):
         self.layers = layers
         self.batch_size = batch_size
 
-        self.quad_features = quad_features  # quadratic features flag
+        self.quad_features = quad_features
         self.input_dim = dim + (dim * (dim + 1)) // 2 if quad_features else dim  # input dim suitable for quad features
 
-        self.inputDense = nn.Linear(self.input_dim, neurons)  # using new input dim
+        self.inputDense = nn.Linear(self.input_dim, neurons)
         self.hidden = [nn.Linear(neurons, neurons)
                        for i in range(layers-1)]
         self.hidden = nn.ModuleList(self.hidden)
         self.outputDense = nn.Linear(neurons, 1)
 
-        self.dropout = nn.Dropout(dropout_rate)  # defined the dropout module
+        self.dropout = nn.Dropout(dropout_rate)
 
         if quad_features:
-            self.register_buffer('quad_mask', torch.triu(torch.ones(dim, dim, dtype=torch.bool)))  # precompute upper triangle mask
+            self.register_buffer('quad_indices', torch.triu_indices(dim, dim))
 
     # x represents our data
     def forward(self, x):
@@ -47,14 +47,11 @@ class EnergyNet(nn.Module):
         """
         if self.quad_features:  # calculation of quadratic features
             if x.dim() == 1:  # for 1 dimensional vectors
-                outer_product = torch.outer(x, x)
-                quadratic_features = outer_product[self.quad_mask]
+                quadratic_features = torch.outer(x, x)[self.quad_indices[0], self.quad_indices[1]]
                 x = torch.cat([x, quadratic_features], dim=0)
             else:
-                x_expanded = x.unsqueeze(2)  # (batch, dim, 1)
-                x_t_expanded = x.unsqueeze(1)  # (batch, 1, dim)
-                outer_product = x_expanded * x_t_expanded  # (batch, dim, dim)
-                quadratic_features = outer_product[:, self.quad_mask]
+                outer_product = x.unsqueeze(2) * x.unsqueeze(1)
+                quadratic_features = outer_product[:, self.quad_indices[0], self.quad_indices[1]]
                 x = torch.cat([x, quadratic_features], dim=1)
 
         x = self.inputDense(x)
@@ -91,15 +88,19 @@ class TensorNet(nn.Module):
         self.hidden = [nn.Linear(neurons, neurons) for _ in range(layers-1)]
         self.hidden = nn.ModuleList(self.hidden)
         self.outputSize = int(dim*(dim-1)/2)
-        self.outputDense = nn.Linear(neurons, self.outputSize) #input, output = number of independent entries of the skew-symmetric L
+        self.outputDense = nn.Linear(neurons, self.outputSize)
         self.sym_sing = -1
         
-        tri_i = torch.triu_indices(dim, dim, 1) #gives two rows: The first contains rows indexes of the upper triangle, the second contains the column indexes. One diagonal (the main) is skipped. The row size is the number of independent components of L.
-        batch_i = torch.tensor([i for i in range(batch_size) for _ in range(tri_i.size(1))]) #batch-numbers, add as many numbers as independent components of L
-        tri_rep = tri_i.repeat(1, batch_size) #repeat batch-size times horizontally
-        self.indices = torch.stack((batch_i, tri_rep[0], tri_rep[1]))
+        """# This locks the maximum bactch size
+        # for variable maximum batch size, this would need to be performed every forward pass
+        tri_i = torch.triu_indices(dim, dim, 1) 
+        batch_i = torch.tensor([i for i in range(batch_size) for _ in range(tri_i.size(1))])
+        tri_rep = tri_i.repeat(1, batch_size) 
+        self.indices = torch.stack((batch_i, tri_rep[0], tri_rep[1]))"""
 
-        self.dropout = nn.Dropout(dropout_rate)  # defined the dropout module
+        self.register_buffer('tri_i', torch.triu_indices(dim, dim, 1))
+
+        self.dropout = nn.Dropout(dropout_rate)
 
     # x represents our data
     def forward(self, x):
@@ -113,19 +114,23 @@ class TensorNet(nn.Module):
 
         x = self.inputDense(x)
         x = F.softplus(x)
-        x = self.dropout(x)  # added dropout
-        for i in range(self.layers-1):
-            x = self.hidden[i](x)
+        x = self.dropout(x)
+        for layer in self.hidden:
+            x = layer(x)
             x = F.softplus(x)
-            x = self.dropout(x)  # added dropout
+            x = self.dropout(x)
+
         data = self.outputDense(x)
         b_n = data.size(0) if data.dim() > 1 else 1
-        z = torch.zeros(b_n, self.dim, self.dim, device=data.device)
-        #print(z)
-        z[self.indices[0, :b_n*self.outputSize], 
+
+        z = torch.zeros(b_n, self.dim, self.dim, device=data.device)        
+        tri_i0, tri_i1 = self.tri_i
+        z[:, tri_i0, tri_i1] = data
+
+        """z[self.indices[0, :b_n*self.outputSize], 
         self.indices[1, :b_n*self.outputSize],
-        self.indices[2, :b_n*self.outputSize]] = data.ravel()
-        #print(z)
+        self.indices[2, :b_n*self.outputSize]] = data.ravel()"""
+
         output = z + self.sym_sing*z.transpose(1, 2)
         return output
         
