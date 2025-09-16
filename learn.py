@@ -18,7 +18,7 @@ from TrajectoryDataset import TrajectoryDataset
 
 #declare default values of parameters
 DEFAULT_dataset = "data/dataset.xyz"
-DEFAULT_batch_size = 20
+DEFAULT_batch_size = 32
 DEFAULT_dt = 0.1 
 DEFAULT_learning_rate = 1.0e-05
 DEFAULT_epochs = 10 
@@ -33,7 +33,7 @@ class Learner(object):
     This is the fundamental class that provides the capability to learn dynamical systems, 
     using various methods of learning (without Jacobi identity, with softly enforced Jacobi, and with implicitly valid Jacobi).
     """
-    def __init__(self, model, batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, cuda = False, dissipative = False):
+    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0, quad_features=False, no_data_to_gpu=True):   # added dropout parameter
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -62,6 +62,8 @@ class Learner(object):
 
         self.dissipative = dissipative
 
+        self.no_data_to_gpu = no_data_to_gpu
+
         #self.logdir = os.path.join("logs", "{}-{}-{}".format(
         #    os.path.basename(globals().get("__file__", "notebook")),
         #    datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
@@ -70,23 +72,21 @@ class Learner(object):
 
         self.df = pd.read_csv(name+"/"+DEFAULT_dataset, dtype=np.float32)
 
-        self.energy = EnergyNet(dim, neurons, layers, batch_size)
-        self.L_tensor = TensorNet(dim, neurons, layers, batch_size)
-        self.jac_vec = JacVectorNet(dim, neurons, layers, batch_size)
-        self.entropy = EnergyNet(dim, neurons, layers, batch_size)
-        self.device = None
-        if cuda:
-            raise Exception("NOT IMPLEMENTED")
-            self.device = torch.cuda.current_device()
-            self.energy = self.energy.to(self.device)
-            self.L_tensor = self.L_tensor.to(self.device)
-            self.jac_vec = self.jac_vec.to(self.device)
-            self.entropy = self.entropy.to(self.device)
-            self.dispot = self.dispot.to(self.device)
+        self.energy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
+        self.L_tensor = TensorNet(dim, neurons, layers, max(batch_size, simulation_batch_size), dropout_rate=dropout_rate)  # added dropout parameter
+        self.jac_vec = JacVectorNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate)  # added dropout parameter
+        self.entropy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
+
+        self.device = device
+        self.energy = self.energy.to(self.device)
+        self.L_tensor = self.L_tensor.to(self.device)
+        self.jac_vec = self.jac_vec.to(self.device)
+        self.entropy = self.entropy.to(self.device)
+        # self.dispot = self.dispot.to(self.device)
 
         self.train, self.test = train_test_split(self.df, test_size=0.4)
-        self.train_dataset = TrajectoryDataset(self.train, model = model)
-        self.valid_dataset = TrajectoryDataset(self.test, model = model)
+        self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
+        self.valid_dataset = TrajectoryDataset(self.test, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
 
         self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
         self.valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=True)
@@ -98,12 +98,12 @@ class Learner(object):
         #constant in M
 
         #for soft and without
-        self.train_metric = torchmetrics.MeanSquaredError()
-        self.val_metric = torchmetrics.MeanSquaredError()
+        self.train_metric = torchmetrics.MeanSquaredError().to(self.device)
+        self.val_metric = torchmetrics.MeanSquaredError().to(self.device)
 
         #for Jacobi
-        self.train_metric_reg = torchmetrics.MeanSquaredError()
-        self.val_metric_reg = torchmetrics.MeanSquaredError()
+        self.train_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
+        self.val_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
 
         self.loss_fn = torch.nn.MSELoss()
 
@@ -253,10 +253,12 @@ class Learner(object):
                 #print("zn = ", zn_tensor)
                 #print("zn2 = ", zn2_tensor)
                 # zero the parameter gradients
-                if self.device != None:
+
+                if self.no_data_to_gpu == False:
                     zn_tensor = zn_tensor.to(self.device)
                     zn2_tensor = zn2_tensor.to(self.device)
                     mid_tensor = mid_tensor.to(self.device)
+                    
                 optimizer.zero_grad()
                 zn_tensor.requires_grad = True
                 zn2_tensor.requires_grad = True
@@ -268,7 +270,7 @@ class Learner(object):
                     mov_loss = self.mov_loss_implicit(zn_tensor, zn2_tensor, mid_tensor)
                 elif method == "soft":
                     mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
-
+                
                 mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
                 loss = mov_value 
                 self.train_metric(torch.zeros_like(mov_value), mov_value)
@@ -297,7 +299,7 @@ class Learner(object):
                             "Training loss (for one batch) at step %d: movement %.4f "
                             % (step, float(mov_value))
                         )
-                    print("Seen so far: %s samples" % ((step + 1) * 64))
+                    #print("Seen so far: %s samples" % ((step + 1) * 64))
 
 
             # Display metrics at the end of each epoch.
@@ -315,6 +317,11 @@ class Learner(object):
             # Run a validation loop at the end of each epoch.
             jacobi_loss = None
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
+
+                if self.no_data_to_gpu == False:
+                    zn_tensor = zn_tensor.to(self.device)
+                    zn2_tensor = zn2_tensor.to(self.device)
+                    mid_tensor = mid_tensor.to(self.device)
 
                 zn_tensor.requires_grad = True
                 zn2_tensor.requires_grad = True
@@ -434,6 +441,40 @@ class LearnerIMR(Learner):
         Jz2, cass2 = self.jac_vec(mid_tensor)
         return (zn_tensor - zn2_tensor)/self.dt + torch.cross(Jz, E_z, dim=1) 
 
+
+class LearnerRK4(Learner):
+    def z_dot(self, zn_tensor):
+        En = self.energy(zn_tensor)
+        E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
+        Lz = self.L_tensor(zn_tensor)
+        return torch.matmul(Lz, E_z.unsqueeze(2)).squeeze()
+
+    def mov_loss_without(self, zn_tensor, zn2_tensor, mid_tensor):
+        k1 = self.dt * self.z_dot(zn_tensor)
+        k2 = self.dt * self.z_dot(zn_tensor + k1/2)
+        k3 = self.dt * self.z_dot(zn_tensor + k2/2)
+        k4 = self.dt * self.z_dot(zn_tensor+ k3)
+        return (zn_tensor-zn2_tensor)/self.dt + 1/6 * (k1 + 2*k2 + 2*k3 +k4)/self.dt
+    
+    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+        mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
+        Lz = self.L_tensor(mid_tensor)
+        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        return mov_loss, jacobi_loss
+    
+    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+        mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
+        Lz = self.L_tensor(mid_tensor)
+        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        return mov_loss, jacobi_loss
+    
+    def mov_loss_implicit(self, zn_tensor, zn2_tensor, mid_tensor):
+        En = self.energy(mid_tensor)
+        E_z = torch.autograd.grad(En.sum(), mid_tensor, only_inputs=True, create_graph=True)[0]
+ 
+        Jz, cass = self.jac_vec(mid_tensor)
+        Jz2, cass2 = self.jac_vec(mid_tensor)
+        return (zn_tensor - zn2_tensor)/self.dt + torch.cross(Jz, E_z, dim=1) 
 
 def check_folder(name):
     """

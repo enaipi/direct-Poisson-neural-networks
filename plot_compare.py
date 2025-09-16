@@ -264,11 +264,11 @@ def get_learned_models():
     """
     models = {}
     if args.without:
-        models["without"] = {"energy":torch.load(args.folder_name+"/saved_models/without_jacobi_energy"), "L":torch.load(args.folder_name+"/saved_models/without_jacobi_L")}
+        models["without"] = {"energy":torch.load(args.folder_name+"/saved_models/without_jacobi_energy", weights_only=False), "L":torch.load(args.folder_name+"/saved_models/without_jacobi_L", weights_only=False)}  # changed weights_only=False
     if args.soft:
-        models["soft"] = {"energy":torch.load(args.folder_name+"/saved_models/soft_jacobi_energy"), "L":torch.load(args.folder_name+"/saved_models/soft_jacobi_L")}
+        models["soft"] = {"energy":torch.load(args.folder_name+"/saved_models/soft_jacobi_energy", weights_only=False), "L":torch.load(args.folder_name+"/saved_models/soft_jacobi_L", weights_only=False)}  # changed weights_only=False
     if args.implicit:
-        models["implicit"] = {"energy":torch.load(args.folder_name+"/saved_models/implicit_jacobi_energy"), "J":torch.load(args.folder_name+"/saved_models/implicit_jacobi_J")}
+        models["implicit"] = {"energy":torch.load(args.folder_name+"/saved_models/implicit_jacobi_energy", weights_only=False), "J":torch.load(args.folder_name+"/saved_models/implicit_jacobi_J", weights_only=False)}  # changed weights_only=False
     return models
 
 def load_normalized_Ls(df, dim): 

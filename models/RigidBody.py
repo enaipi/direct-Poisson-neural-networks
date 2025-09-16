@@ -10,7 +10,7 @@ from models.Model import EnergyNet, TensorNet, JacVectorNet
 from learn import DEFAULT_folder_name
 
 class RigidBody(object): #Parent Rigid body class
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, T=100, verbose = False):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, T=100, verbose = False, device = "cpu"):
         """
         The above function is the initialization function for a class that represents a physical system,
         setting up various parameters and variables.
@@ -38,13 +38,14 @@ class RigidBody(object): #Parent Rigid body class
             self.Jy = 1/Ix - 1/Iz
             self.Jz = 1/Iy - 1/Ix
 
-        self.mx = mx
-        self.my = my
-        self.mz = mz
+        self.device = device
+        self.mx = torch.as_tensor(mx, device=self.device)
+        self.my = torch.as_tensor(my, device=self.device)
+        self.mz = torch.as_tensor(mz, device=self.device)
 
-        self.mx0 = mx
-        self.my0 = my
-        self.mz0 = mz
+        self.mx0 = torch.as_tensor(mx, device=self.device)
+        self.my0 = torch.as_tensor(my, device=self.device)
+        self.mz0 = torch.as_tensor(mz, device=self.device)
 
         self.dt = dt
         self.tau = dt*alpha
@@ -232,8 +233,15 @@ class RigidBody(object): #Parent Rigid body class
         :param m: The parameter "m" is a scalar value
         :return: The function `get_L` returns a 3x3 numpy array `L` which is calculated using the values of `self.mx`, `self.my`, and `self.mz`.
         """
-        L = -1*np.array([[0.0, self.mz, -self.my],[-self.mz, 0.0, self.mx],[self.my, -self.mx, 0.0]])
-        return L
+        # L = -1*np.array([[0.0, self.mz, -self.my],[-self.mz, 0.0, self.mx],[self.my, -self.mx, 0.0]])
+        # return L
+        zeros = torch.zeros_like(self.mx)
+        L = torch.stack([
+            torch.stack([zeros, self.mz, -self.my], dim=1),
+            torch.stack([-self.mz, zeros, self.mx], dim=1),
+            torch.stack([self.my, -self.mx, zeros], dim=1)
+        ], dim=1)
+        return - L
         
     def get_E(self, m):
         """
@@ -245,7 +253,7 @@ class RigidBody(object): #Parent Rigid body class
         return self.energy()
 
 class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a from https://doi.org/10.1016/j.physd.2019.06.006, τ=dt
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for the RBEhrenfest class, which is a subclass of another
         class.
@@ -260,7 +268,7 @@ class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a fro
         :param dt: dt is the time step size for the simulation. It determines how small the time interval are between each step in the simulation
         :param alpha: The parameter "alpha" is a damping parameter. 
         """
-        super(RBEhrenfest, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha)
+        super(RBEhrenfest, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
 
     def m_new(self, with_entropy = False): #return new m and update RB
         """
@@ -271,26 +279,26 @@ class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a fro
         :return: the updated value of the angular momentum vector, `m_new`.
         """
         #calculate
-        mOld = [self.mx, self.my, self.mz]
-        ω = np.dot(self.d2E, mOld) # (mx/Ix, my/Iy, mz/Iz) = dE/dm = ω
-        ham = np.cross(mOld, ω) #m x E_m
+        mOld = torch.stack([self.mx, self.my, self.mz], dim=1)
 
-        Mreg = np.cross(mOld , np.dot(self.d2E, ham))
-        Nreg = np.cross(ham, ω)
+        ω = torch.matmul(self.d2E, mOld.T).T # (mx/Ix, my/Iy, mz/Iz) = dE/dm = ω
+        ham = torch.cross(mOld, ω, dim=1) #m x E_m
+        Mreg = torch.cross(mOld, (self.d2E @ ham.T).T, dim=1)
+        Nreg = torch.cross(ham, ω, dim=1)
         reg = 0.5*self.dt * (Mreg+Nreg)
 
         m_new = mOld + self.dt*ham + self.dt*reg
 
         #update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
 
         return m_new
 
 
 class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for a class called RBESeReCN, which is a subclass of another
         class.
@@ -305,9 +313,9 @@ class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
         :param dt: dt is the time step size for the simulation. It determines the granularity of the simulation and how frequently the system is updated
         :param alpha: The alpha parameter is a constant that determines the weight of the regularization.
         """
-        super(RBESeReCN, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha)
+        super(RBESeReCN, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the difference between the old and new values of `m` and returns the
         result.
@@ -316,47 +324,75 @@ class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
         :return: a tuple containing the values of `res[0]`, `res[1]`, and `res[2]`.
         """
 
-        mOld = [self.mx, self.my, self.mz]
-        dot = np.dot(self.d2E, mOld)
+        if mOld is None:
+            mOld = [self.mx, self.my, self.mz]
+
+        if torch.is_tensor(self.d2E):
+            d2E = self.d2E.detach().cpu().numpy()
+
+        dot = np.dot(d2E, mOld)
         ham = np.cross(mOld, dot)
 
         #regularized part t
-        dotR = np.dot(self.d2E, ham)
+        dotR = np.dot(d2E, ham)
         reg  = np.cross(dotR, mOld)
 
         #Hamiltionian part t+1
-        dotNNew = np.dot(self.d2E, mNew)
+        dotNNew = np.dot(d2E, mNew)
         hamNew = np.cross(mNew, dotNNew)
 
         #regularized part t+1
-        dotRNew = np.dot(self.d2E, hamNew)
+        dotRNew = np.dot(d2E, hamNew)
         regNew  = np.cross(dotRNew, mNew)
-
 
         res = mOld - mNew + self.dt/2*(ham + hamNew) #+ self.dt*self.tau/4*(reg + regNew)
 
         return (res[0], res[1], res[2])
+    
+    def _hamiltonian(self, m):
+        dot = (self.d2E @ m.T).T
+        ham = torch.cross(m, dot, dim=1)
+        return ham
+    
+    def m_new(self, with_entropy = False, solver_iterations=200, tol=1e-6):
+        m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
+        m_new = m_old.clone()
 
-    def m_new(self, with_entropy = False): #return new m and update RB
-        """
-        The function `m_new` calculates and returns new values for `mx`, `my`, and `mz`, and updates the
-        corresponding variables in the class instance.
-        
-        :param with_entropy: The "with_entropy" parameter is a boolean flag that determines whether or not to include entropy in the calculation of the new angular momentum. If set to True, entropy will be considered in the calculation. If set to False, entropy will not be considered, defaults to False (optional)
-        :return: the updated values of mx, my, and mz as a tuple.
-        """
-        #calculate
-        m_new = fsolve(self.f, (self.mx, self.my, self.mz))
+        ham_old = self._hamiltonian(m_old)
 
-        #update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
+        for _ in range(solver_iterations):
+            m_prev = m_new.clone()
+            ham_new = self._hamiltonian(m_prev)
+
+            m_new = m_old + 0.5 * self.dt * (ham_old + ham_new)
+
+            diff = torch.norm(m_new - m_prev, dim=1)
+            denom = torch.norm(m_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m_new.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    m_sol = fsolve(lambda x: self.f(x, m0ld=m_old_np[idx]), m_new_np[idx])
+                    m_new[idx] = torch.tensor(m_sol, dtype=m_old.dtype, device=m_old.device)
+
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
 
         return m_new
 
 class RBIMR(RigidBody):#implicit midpoint
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, device="cpu"):
         """
         The function initializes an instance of the RBIMR class with given parameters.
         
@@ -369,9 +405,9 @@ class RBIMR(RigidBody):#implicit midpoint
         :param mz: The parameter "mz" represents the moment of inertia about the z-axis
         :param dt: The parameter "dt" represents the time step or time interval between each iteration or calculation in the RBIMR class.
         """
-        super(RBIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, 0.0)
+        super(RBIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, 0.0, device=device)
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residual of a given angular field vector `mNew` by using the
         previous angular field vector `mOld` and other variables.
@@ -380,17 +416,97 @@ class RBIMR(RigidBody):#implicit midpoint
         :return: a tuple containing the values of `res[0]`, `res[1]`, and `res[2]`.
         """
 
-        mOld = [self.mx, self.my, self.mz]
+        if mOld is None:
+            mOld = [self.mx, self.my, self.mz]
+        
+        if torch.is_tensor(self.d2E):
+            d2E = self.d2E.detach().cpu().numpy()   
+
         m_mid = [0.5*(mOld[i]+mNew[i]) for i in range(len(mOld))]
 
-        dot = np.dot(self.d2E, m_mid)
+        dot = np.dot(d2E, m_mid)
         ham = np.cross(m_mid, dot)
 
         res = mOld - mNew + self.dt*ham
 
         return (res[0], res[1], res[2])
 
-    def m_new(self, with_entropy = False): #return new m and update RB
+    def m_new(self, with_entropy = False, solver_iterations=200, tol=1e-6): #return new m and update RB
+        """
+        The function `m_new` calculates and returns new values for `mx`, `my`, and `mz`, and updates the
+        corresponding variables in the class.
+        
+        :param with_entropy: The "with_entropy" parameter is a boolean flag that determines whether or not to include entropy in the calculation of the new value of m. If set to True, entropy will be considered in the calculation. If set to False, entropy will not be considered, defaults to False (optional)
+        :return: the updated values of mx, my, and mz as a tuple.
+        """
+        m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
+        m_new = m_old.clone()
+
+        for _ in range(solver_iterations):
+            m_prev = m_new.clone()
+            m_mid = 0.5 * (m_old + m_prev)
+            m_mid.requires_grad_(True)
+
+            dot = (self.d2E @ m_mid.T).T
+            hamiltonian = torch.cross(m_mid, dot, dim=1)
+            m_new = m_old + self.dt * hamiltonian
+
+            diff = torch.norm(m_new - m_prev, dim=1)
+            denom = torch.norm(m_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m_new.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    m_sol = fsolve(lambda x: self.f(x, mOld=m_old_np[idx]), m_new_np[idx])
+                    m_new[idx] = torch.tensor(m_sol, dtype=m_old.dtype, device=m_old.device)
+
+        #update
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
+
+        return m_new
+
+
+class RBRK4(RigidBody):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, tau, device="cpu"):
+        """
+        The function initializes an instance of the RBRK4 class with given parameters.
+        
+        :param Ix: The moment of inertia about the x-axis
+        :param Iy: The parameter "Iy" represents the moment of inertia about the y-axis. It is a measure of an object's resistance to changes in rotation about the y-axis
+        :param Iz: The parameter "Iz" represents the moment of inertia about the z-axis. It is a measure of an object's resistance to changes in its rotational motion about the z-axis
+        :param d2E: The parameter "d2E" likely represents the second derivative of the energy function. It could be a function or a value that represents the rate of change of energy with respect to time
+        :param mx: The parameter "mx" represents the x-component of the moment of inertia
+        :param my: The parameter "my" represents the moment of inertia about the y-axis
+        :param mz: The parameter "mz" represents the moment of inertia about the z-axis
+        :param dt: The parameter "dt" represents the time step or time interval between each iteration or calculation in the RBRK4 class.
+        """
+        super(RBRK4, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, 0.0, device=device)
+        self.tau = tau
+
+    def m_dot(self,m):
+        L = self.get_L(m)
+
+        d2E_m = (self.d2E @ m.T).T
+        LdH = torch.bmm(L, d2E_m.unsqueeze(-1)).squeeze(-1)
+        d2E_LdH = (self.d2E @ LdH.T).T
+
+        M = 0.5 * torch.bmm(L, d2E_LdH.unsqueeze(-1)).squeeze(-1)
+        
+        return LdH + self.tau*M
+
+    def m_new(self, with_entropy = False):
         """
         The function `m_new` calculates and returns new values for `mx`, `my`, and `mz`, and updates the
         corresponding variables in the class.
@@ -399,18 +515,23 @@ class RBIMR(RigidBody):#implicit midpoint
         :return: the updated values of mx, my, and mz as a tuple.
         """
         #calculate
-        m_new = fsolve(self.f, (self.mx, self.my, self.mz))
+        m = torch.stack([self.mx, self.my, self.mz], dim=1)
+        k1 = self.m_dot(m)
+        k2 = self.m_dot(m + self.dt*k1/2)
+        k3 = self.m_dot(m + self.dt*k2/2)
+        k4 = self.m_dot(m + self.dt*k3)
+        m_new = m + self.dt/6*(k1 + 2*k2 + 2*k3 + k4)
 
         #update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
 
         return m_new
 
 
 class RBESeReFE(RigidBody):#SeRe forward Euler
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device="cpu"):
         """
         The above function is the constructor for a class called RBESeReFE, which is a subclass of another
         class.
@@ -425,7 +546,7 @@ class RBESeReFE(RigidBody):#SeRe forward Euler
         :param dt: dt is the time step size for the simulation. It determines the granularity of the simulation and how frequently the calculations are performed
         :param alpha: The alpha parameter is a constant that determines the strength of the regularization term in the RBESeReFE algorithm. 
         """
-        super(RBESeReFE, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha)
+        super(RBESeReFE, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
 
     def m_new(self, with_entropy = False):
         """
@@ -436,33 +557,37 @@ class RBESeReFE(RigidBody):#SeRe forward Euler
         :param with_entropy: A boolean parameter that determines whether or not to calculate the new entropy using explicit forward Euler. If set to True, the entropy will be calculated and updated. If set to False, the entropy will not be calculated, defaults to False (optional)
         :return: the updated value of the angular momentum vector, `m`.
         """
+        mOld = torch.stack([self.mx, self.my, self.mz], dim=1)
+        
+        dot = (self.d2E @ mOld.T).T
+        ham = torch.cross(mOld, dot, dim=1)
 
-        #Construct mOld
-        mOld = [self.mx, self.my, self.mz]
-
-        #calculate
-        dot = np.dot(self.d2E, mOld)
-        ham = np.cross(mOld, dot)
-
-        #regularized part t
-        dotR = np.dot(self.d2E, ham)
-        reg  = np.cross(dotR, mOld)
+        dotR = (self.d2E @ ham.T).T
+        reg = torch.cross(dotR, mOld, dim=1)
 
         m = mOld + self.dt*ham - self.dt*self.tau/2*reg
 
-        #update
-        self.mx = m[0]
-        self.my = m[1]
-        self.mz = m[2]
+        self.mx = m[:, 0]
+        self.my = m[:, 1]
+        self.mz = m[:, 2]
 
         if with_entropy: #calculate new entropy using explicit forward Euler
             sin_new = self.sin+ 0.5*(self.tau-self.dt)*self.dt/self.Ein_s() * ((self.my*self.mz*self.Jx)**2/self.Ix + (self.mz*self.mx*self.Jy)**2/self.Iy + (self.mx*self.my*self.Jz)**2/self.Iz)
             self.sin = sin_new
 
+        if with_entropy:
+            sin_new = (
+                self.sin + 0.5 * (self.tau - self.dt) * self.dt / self.Ein_s() *
+                ((self.my * self.mz * self.Jx) ** 2 / self.Ix +
+                 (self.mz * self.mx * self.Jy) ** 2 / self.Iy +
+                 (self.mx * self.my * self.Jz) ** 2 / self.Iz)
+            )
+            self.sin = sin_new
+
         return m
 
 class Neural(RigidBody):#SeRe forward Euler
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = "without", name = DEFAULT_folder_name, device = "cpu"):
         """
         The function initializes a Neural object with specified parameters and loads a pre-trained neural
         network based on the chosen method.
@@ -479,30 +604,40 @@ class Neural(RigidBody):#SeRe forward Euler
         :param method: The "method" parameter is used to specify the method for calculating the energy and L matrices in the Neural class. It can take one of the following values:, defaults to without (optional)
         :param name: The `name` parameter is a string that represents the folder name where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. The `name` parameter is used to construct the file paths for loading the models
         """
-        super(Neural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha)
+        super(Neural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
         # Load network
         self.method = method
         if method == "soft":
-            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "without":
-            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/without_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "implicit":
-            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()
-            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J')
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
             self.J_net.eval()
             def L_net(z):
-                L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
-                return L
+                zeros = torch.zeros_like(self.mx)
+                L = torch.stack([
+                    torch.stack([zeros, z[:, 2], -z[:, 1]], dim=1),
+                    torch.stack([-z[:, 2], zeros, z[:, 0]], dim=1),
+                    torch.stack([z[:, 1], -z[:, 0], zeros], dim=1)
+                ], dim=1)
+                return -L
             self.L_net = L_net
         else:
             raise Exception("Unkonown method: ", method)
+
+        self.device = device
+        self.energy_net.to(self.device)
+        if hasattr(self, 'L_net') and isinstance(self.L_net, torch.nn.Module): self.L_net.to(self.device)
+        if hasattr(self, 'J_net'): self.J_net.to(self.device)
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -513,31 +648,31 @@ class Neural(RigidBody):#SeRe forward Euler
         :param z: The parameter `z` is the input to the `neural_zdot` function. It is a tensor or array that represents the input data for the neural network.
         :return: the hamiltonian, which is a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
+        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         En = self.energy_net(z_tensor)
 
         E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
         E_z = torch.flatten(E_z)
 
         if self.method == "soft" or self.method == "without":
-            L = self.L_net(z_tensor).detach().numpy()[0]
-            hamiltonian = np.matmul(L, E_z.detach().numpy())
+            L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+            hamiltonian = np.matmul(L, E_z.detach().cpu().numpy())
         else:
             J, cass = self.J_net(z_tensor)
-            J = J.detach().numpy()
-            hamiltonian = np.cross(J, E_z.detach().numpy())
+            J = J.detach().cpu().numpy()
+            hamiltonian = np.cross(J, E_z.detach().cpu().numpy())
 
         return hamiltonian
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the difference between two sets of values and returns the result.
         
         :param mNew: The parameter `mNew` represents the new values of `mx`, `my`, and `mz`
         :return: a tuple containing the values of `res[0]`, `res[1]`, and `res[2]`.
         """
-
-        mOld = [self.mx, self.my, self.mz]
+        if mOld is None:
+            mOld = [self.mx, self.my, self.mz]
 
         zdo = self.neural_zdot(mOld)
         zd = self.neural_zdot(mNew)
@@ -554,9 +689,10 @@ class Neural(RigidBody):#SeRe forward Euler
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network `J_net`. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32` and `requires_grad` set to `True`. The `requires_grad` flag
         :return: the value of `cass` as a NumPy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        J, cass = self.J_net(z_tensor)
-        return cass.detach().numpy()
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        z.requires_grad_(True)
+        J, cass = self.J_net(z)
+        return cass
 
     def get_L(self, z):
         """
@@ -566,8 +702,8 @@ class Neural(RigidBody):#SeRe forward Euler
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        L = self.L_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        L = self.L_net(z)
         return L
 
     def get_E(self, z):
@@ -578,30 +714,67 @@ class Neural(RigidBody):#SeRe forward Euler
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        E = self.energy_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        E = self.energy_net(z)
         return E
-
-    def m_new(self, with_entropy = False): #return new m and update RB
-        """
-        The function `m_new` calculates new values for `mx`, `my`, and `mz` using the `fsolve` function and
-        updates the corresponding variables.
+    
+    def _hamiltonian(self, z_tensor):
+        z_tensor.requires_grad_(True)
+        En = self.energy_net(z_tensor).squeeze(-1)
         
-        :param with_entropy: The parameter "with_entropy" is a boolean flag that determines whether or not to include entropy in the calculation of the new value of m. If it is set to True, entropy will be considered in the calculation. If it is set to False, entropy will not be considered, defaults to False (optional)
-        :return: the updated values of mx, my, and mz as a tuple.
-        """
-        #calculate
-        m_new = fsolve(self.f, (self.mx, self.my, self.mz))
+        E_z = torch.autograd.grad(En.sum(), z_tensor, create_graph=True)[0]
+        
+        if self.method == "soft" or self.method == "without":
+            L = self.L_net(z_tensor)
+            hamiltonian = torch.matmul(L, E_z.unsqueeze(-1)).squeeze(-1)
+        else: # "implicit"
+            J, cass = self.J_net(z_tensor)
+            # J = J.squeeze(0)
+            # cass = cass.squeeze(0)
+            hamiltonian = torch.cross(J, E_z, dim=-1)
+            
+        return hamiltonian
+    
+    def m_new(self, with_entropy=False, solver_iterations=200, tol=1e-6):
+        m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
+        m_new = m_old.clone()
 
-#       update
-        self.mx = m_new[0]
-        self.my = m_new[1]
-        self.mz = m_new[2]
+        zd_old = self._hamiltonian(m_old)
+
+        for _ in range(solver_iterations):
+            m_prev = m_new.clone()
+
+            zd_new = self._hamiltonian(m_prev)
+            m_new = m_old + 0.5 * self.dt * (zd_old + zd_new)
+
+            diff = torch.norm(m_new - m_prev, dim=1)
+            denom = torch.norm(m_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m_new.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    m_sol = fsolve(lambda x: self.f(x, mOld=m_old_np[idx]), m_new_np[idx])
+                    m_new[idx] = torch.tensor(m_sol, dtype=m_old.dtype, device=m_old.device)
+
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
 
         return m_new
 
+
 class RBNeuralIMR(Neural):#implicit midpoint rule
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = "without", name = DEFAULT_folder_name, device = "cpu"):
         """
         The above function is the constructor for a class called RBNeuralIMR, which is a subclass of another
         class.
@@ -618,9 +791,9 @@ class RBNeuralIMR(Neural):#implicit midpoint rule
         :param method: The "method" parameter is used to specify the method to be used for the calculation. The default value is set to "without", defaults to without (optional)
         :param name: The name parameter is used to specify the folder name where the results of the RBNeuralIMR class will be saved. If no name is provided, it will use the DEFAULT_folder_name
         """
-        super(RBNeuralIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = method, name = name)
+        super(RBNeuralIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, method = method, name = name, device=device)
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the difference between the old and new values of `m` and adds the
         product of the time step `dt` and the derivative of `z` to it.
@@ -628,8 +801,9 @@ class RBNeuralIMR(Neural):#implicit midpoint rule
         :param mNew: The parameter `mNew` represents the new values of `mx`, `my`, and `mz`
         :return: a tuple containing three values: res[0], res[1], and res[2].
         """
+        if mOld is None:
+            mOld = [self.mx, self.my, self.mz]
 
-        mOld = [self.mx, self.my, self.mz]
         m_mid = [0.5*(mOld[i]+mNew[i]) for i in range(len(mOld))]
 
         zd = self.neural_zdot(m_mid)
@@ -639,9 +813,47 @@ class RBNeuralIMR(Neural):#implicit midpoint rule
         return (res[0], res[1], res[2])
 
 
+    def m_new(self, with_entropy = False, solver_iterations=200, tol=1e-6):
+        m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
+
+        m_new = m_old.clone()
+
+        for _ in range(solver_iterations):
+            m_prev = m_new.clone()
+            m_mid = 0.5 * (m_old + m_prev)
+            m_mid.requires_grad_(True)
+
+            hamiltonian = self._hamiltonian(m_mid)
+            m_new = m_old + self.dt * hamiltonian
+
+            diff = torch.norm(m_new - m_prev, dim=1)
+            denom = torch.norm(m_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m_new.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    m_sol = fsolve(lambda x: self.f(x, mOld=m_old_np[idx]), m_new_np[idx])
+                    m_new[idx] = torch.tensor(m_sol, dtype=m_old.dtype, device=m_old.device)
+
+        self.mx = m_new[:, 0]
+        self.my = m_new[:, 1]
+        self.mz = m_new[:, 2]
+        
+        return m_new
+
 
 class HeavyTopCN(RigidBody): #Crank-Nicolson
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz, device="cpu"):
         """
         The function initializes the HeavyTopCN class with given parameters. CN stands for the Crank-Nicholson method.
         
@@ -659,10 +871,16 @@ class HeavyTopCN(RigidBody): #Crank-Nicolson
         :param init_ry: The parameter `init_ry` represents the initial value for the y-coordinate of the vector `r`. It is used in the initialization of the `HeavyTopCN` class
         :param init_rz: The parameter `init_rz` represents the initial value of the z-coordinate of the vector `r`. It is used in the initialization of the `HeavyTopCN` class
         """
-        super(HeavyTopCN, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha)
+        super(HeavyTopCN, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
         self.Mgl = Mgl #Hamiltonian = 1/2 M I^{-1} M + Mgl r . chi
-        self.chi = np.array((0.0, 0.0, 1.0))
-        self.r = np.array((init_rx, init_ry, init_rz))
+        # self.chi = np.array((0.0, 0.0, 1.0))
+        self.chi = torch.tensor((0.0, 0.0, 1.0), device=device)
+
+        # self.r = np.array((init_rx, init_ry, init_rz))
+        self.rx = torch.as_tensor(init_rx, device=self.device)
+        self.ry = torch.as_tensor(init_ry, device=self.device)
+        self.rz = torch.as_tensor(init_rz, device=self.device)
+        
 
     def get_E(self, m):
         """
@@ -673,7 +891,8 @@ class HeavyTopCN(RigidBody): #Crank-Nicolson
         :param m: The parameter `m` represents the mass of the object
         :return: the sum of the energy calculated by the parent class (using the `energy()` method) and the dot product of `self.r` and `self.chi`, multiplied by `self.Mgl`.
         """
-        return super(HeavyTopCN,self).energy() + self.Mgl*np.dot(self.r, self.chi)
+        #return super(HeavyTopCN,self).energy() + self.Mgl*np.dot(self.r, self.chi)
+        return super(HeavyTopCN, self).energy() + self.Mgl * self.rz
 
     def get_L(self, m):
         """
@@ -683,97 +902,202 @@ class HeavyTopCN(RigidBody): #Crank-Nicolson
         :param m: The parameter `m` is not defined in the code snippet you provided. It is a variable that represents the moment of inertia.
         :return: The function `get_L` returns a numpy array `L` which is a 6x6 matrix.
         """
-        L = np.array([
+        """L = np.array([
             [0.0, -self.mz, self.my, 0.0, -self.r[2], self.r[1]],
             [self.mz, 0.0, -self.mx, self.r[2], 0.0, -self.r[0]],
             [self.my, -self.mx, 0.0, -self.r[1], self.r[0], 0.0],
             [0.0, -self.r[2], self.r[1], 0.0, 0.0, 0.0],
             [self.r[2], 0.0, -self.r[0], 0.0, 0.0, 0.0],
-            [-self.r[1], self.r[0], 0.0, 0.0, 0.0, 0.0]])
+            [-self.r[1], self.r[0], 0.0, 0.0, 0.0, 0.0]])"""
+        zeros = torch.zeros_like(self.mx)
+        L = torch.stack([
+                torch.stack([zeros, -self.mz, self.my, zeros, -self.rz, self.ry], dim=1),
+                torch.stack([self.mz, zeros, -self.mx, self.rz, zeros, -self.rx], dim=1),
+                torch.stack([self.my, -self.mx, zeros, -self.ry, self.rx, zeros], dim=1),
+                torch.stack([zeros, -self.rz, self.ry, zeros, zeros, zeros], dim=1),
+                torch.stack([self.rz, zeros, -self.rx, zeros, zeros, zeros], dim=1),
+                torch.stack([-self.ry, self.rx, zeros, zeros, zeros, zeros], dim=1)
+                ], dim=1)
         return L
 
-    def f(self, mrnew):#defines the function f zero of which is sought
+    def f(self, mrnew, mrold = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residuals for a given set of input variables.
         
         :param mrnew: The parameter `mrnew` is a tuple containing the values for `mNew` and `rNew`
         :return: a tuple containing the values of `m_res[0]`, `m_res[1]`, `m_res[2]`, `r_res[0]`, `r_res[1]`, and `r_res[2]`.
         """
-        mNew = (mrnew[0], mrnew[1], mrnew[2])
-        rNew = (mrnew[3], mrnew[4], mrnew[5])
-        mOld = np.array((self.mx, self.my, self.mz))
-        rOld = self.r
+        m_new = np.array((mrnew[0], mrnew[1], mrnew[2]))
+        r_new = np.array((mrnew[3], mrnew[4], mrnew[5]))
 
-        m_dot = np.dot(self.d2E, mOld)
-        m_ham = np.cross(mOld, m_dot)
-        m_r = np.cross(rOld, self.Mgl*self.chi)
-        r_m = np.cross(rOld, m_dot)
+        if mrold is None:
+            m_old = np.array((self.mx, self.my, self.mz))
+            r_old = np.array((self.rx, self.ry, self.rz))
+        else:
+            m_old = np.array((mrold[0], mrold[1], mrold[2]))
+            r_old = np.array((mrold[3], mrold[4], mrold[5]))
 
-        #Hamiltionian part t+1
-        m_dotNew = np.dot(self.d2E, mNew)
-        m_hamNew = np.cross(mNew, m_dotNew)
-        m_rNew = np.cross(rNew, self.Mgl*self.chi)
-        r_mNew = np.cross(rNew, m_dotNew)
+        m_dot_old = np.dot(self.d2E, m_old)
+        m_ham_old = np.cross(m_old, m_dot_old)
+        m_r_old = np.cross(r_old, self.Mgl*self.chi)
+        r_m_old = np.cross(r_old, m_dot_old)
 
-        m_res = mOld - mNew + self.dt/2*(m_ham + m_r + m_hamNew + m_rNew)
-        r_res = rOld - rNew + self.dt/2*(r_m + r_mNew)
+        m_dot_new = np.dot(self.d2E, m_new)
+        m_ham_new = np.cross(m_new, m_dot_new)
+        m_r_new = np.cross(r_new, self.Mgl*self.chi)
+        r_m_new = np.cross(r_new, m_dot_new)
 
-        #return (res[0], res[1], res[2]) 
-        return (m_res[0], m_res[1], m_res[2], r_res[0], r_res[1], r_res[2])
+        m_res = m_old - m_new + (self.dt / 2) * (m_ham_old + m_r_old + m_ham_new + m_r_new)
+        r_res = r_old - r_new + (self.dt / 2) * (r_m_old + r_m_new)
 
-    def m_new(self, with_entropy = False): #return new m and update RB
-        """
-        The function `m_new` calculates new values for `mx`, `my`, `mz`, and `r` using the `fsolve` function
-        and returns the updated values.
+        return np.concat((m_res, r_res))
+    
+    def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
+        m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
+        r_old = torch.stack([self.rx, self.ry, self.rz], dim=1)
+
+        chi_batched = self.chi.unsqueeze(0).expand(r_old.shape[0], -1)
+
+        m_new = m_old.clone()
+        r_new = r_old.clone()
+    
+        m_dot_old = (self.d2E @ m_old.T).T
         
-        :param with_entropy: The parameter "with_entropy" is a boolean flag that determines whether or not to include entropy in the calculation. If it is set to True, entropy will be included in the calculation. If it is set to False, entropy will not be included, defaults to False (optional)
-        :return: a tuple containing the updated values of (self.mx, self.my, self.mz) and self.r.
-        """
-        #calculate
-        (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]) = fsolve(self.f, (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]))
+        m_ham_old = torch.cross(m_old, m_dot_old, dim=1)
+        m_r_old = torch.cross(r_old, self.Mgl * chi_batched, dim=1)
+        r_m_old = torch.cross(r_old, m_dot_old, dim=1)
 
-        #update
-        #self.mx = m_new[0]
-        #self.my = m_new[1]
-        #self.mz = m_new[2]
-        #self.r = r_new
+        for _ in range(solver_iterations):
+            m_dot_new = (self.d2E @ m_new.T).T
 
-        return ((self.mx, self.my, self.mz), self.r)
+            m_ham_new = torch.cross(m_new, m_dot_new, dim=1)
+            m_r_new = torch.cross(r_new, self.Mgl * chi_batched, dim=1)
+            r_m_new = torch.cross(r_new, m_dot_new, dim=1)
 
+            m_next = m_old + (self.dt / 2) * (m_ham_old + m_r_old + m_ham_new + m_r_new)
+            r_next = r_old + (self.dt / 2) * (r_m_old + r_m_new)
+
+            rel_m_error = torch.norm(m_next - m_new, dim =1) / (torch.norm(m_new, dim=1) + 1e-12)
+            rel_r_error = torch.norm(r_next - r_new, dim =1) / (torch.norm(r_new, dim=1) + 1e-12)
+
+            if torch.all(rel_m_error < tol) and torch.all(rel_r_error < tol):
+                m_new, r_new = m_next, r_next
+                break
+            
+            m_new, r_new = m_next, r_next
+        else:
+            not_converged = torch.logical_or((rel_m_error >= tol), (rel_r_error >= tol))
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m_new.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+                r_new_np = r_new.detach().cpu().numpy()
+                r_old_np = r_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    mr_new = np.concat((m_new_np[idx], r_new_np[idx]))
+                    mr_old = np.concat((m_old_np[idx], r_old_np[idx]))
+                    mr_sol = fsolve(lambda x: self.f(x, mrold=mr_old), mr_new)
+                    m_new[idx] = torch.tensor(mr_sol[:3], dtype=m_new.dtype, device=m_new.device)
+                    r_new[idx] = torch.tensor(mr_sol[3:], dtype=r_new.dtype, device=r_new.device)
+
+        self.mx, self.my, self.mz = m_new[:, 0], m_new[:, 1], m_new[:, 2]
+        self.rx, self.ry, self.rz = r_new[:, 0], r_new[:, 1], r_new[:, 2]
+
+        return (m_new, r_new)
+    
 class HeavyTopIMR(HeavyTopCN): #implicit midpoint rule
     #def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz):
     #    super(HeavyTopIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx,  init_ry,  init_rz)
 
-    def f(self, mrnew):#defines the function f zero of which is sought
+    def f(self, mrnew, mrold = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residuals for a given set of inputs and returns them as a tuple.
         
         :param mrnew: The parameter `mrnew` is a list or tuple containing the following elements:
         :return: a tuple containing the values of `m_res[0]`, `m_res[1]`, `m_res[2]`, `r_res[0]`, `r_res[1]`, and `r_res[2]`.
         """
-        mNew = (mrnew[0], mrnew[1], mrnew[2])
-        rNew = (mrnew[3], mrnew[4], mrnew[5])
-        mOld = np.array((self.mx, self.my, self.mz))
-        rOld = self.r
-        m_mid = [0.5*(mOld[i]+mNew[i]) for i in range(len(mOld))]
-        r_mid = [0.5*(rOld[i]+rNew[i]) for i in range(len(rOld))]
+        m_new = np.array((mrnew[0], mrnew[1], mrnew[2]))
+        r_new = np.array((mrnew[3], mrnew[4], mrnew[5]))
 
+        if mrold is None:
+            m_old = np.array((self.mx, self.my, self.mz))
+            r_old = np.array((self.rx, self.ry, self.rz))
+        else:
+            m_old = np.array((mrold[0], mrold[1], mrold[2]))
+            r_old = np.array((mrold[3], mrold[4], mrold[5]))
+        
+        m_mid = [0.5*(m_old[i]+m_new[i]) for i in range(len(m_old))]
+        r_mid = [0.5*(r_old[i]+r_new[i]) for i in range(len(r_old))]
 
         m_dot = np.dot(self.d2E, m_mid)
         m_ham = np.cross(m_mid, m_dot)
         m_r = np.cross(r_mid, self.Mgl*self.chi)
         r_m = np.cross(r_mid, m_dot)
 
-        m_res = mOld - mNew + self.dt*(m_ham + m_r)
-        r_res = rOld - rNew + self.dt*r_m 
+        m_res = m_old - m_new + self.dt*(m_ham + m_r)
+        r_res = r_old - r_new + self.dt*r_m 
 
-        #return (res[0], res[1], res[2]) 
-        return (m_res[0], m_res[1], m_res[2], r_res[0], r_res[1], r_res[2])
+        return np.concat((m_res, r_res))
 
+    def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
+        m = torch.stack([self.mx, self.my, self.mz], dim=1)
+        r = torch.stack([self.rx, self.ry, self.rz], dim=1)
+
+        m_old = m.clone()
+        r_old = r.clone()
+
+        chi_batched = self.chi.unsqueeze(0).expand(r_old.shape[0], -1)
+
+        for _ in range(solver_iterations):
+            m_mid = 0.5 * (m_old + m)
+            r_mid = 0.5 * (r_old + r)
+
+            m_dot = (self.d2E @ m_mid.T).T
+
+            m_ham = torch.cross(m_mid, m_dot, dim=1)
+            m_r = torch.cross(r_mid, self.Mgl * chi_batched, dim=1)
+            r_m = torch.cross(r_mid, m_dot, dim=1)
+
+            m_new = m_old + self.dt * (m_ham + m_r)
+            r_new = r_old + self.dt * r_m
+
+            rel_m_error = torch.norm(m - m_new, dim =1) / (torch.norm(m, dim=1) + 1e-12)
+            rel_r_error = torch.norm(r - r_new, dim =1) / (torch.norm(r, dim=1) + 1e-12)
+
+            if torch.all(rel_m_error < tol) and torch.all(rel_r_error < tol):
+                m, r = m_new, r_new
+                break
+
+            m, r = m_new, r_new
+        else:
+            not_converged = torch.logical_or((rel_m_error >= tol), (rel_r_error >= tol))
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                m_new_np = m.detach().cpu().numpy()
+                m_old_np = m_old.detach().cpu().numpy()
+                r_new_np = r.detach().cpu().numpy()
+                r_old_np = r_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    mr_new = np.concat((m_new_np[idx], r_new_np[idx]))
+                    mr_old = np.concat((m_old_np[idx], r_old_np[idx]))
+                    mr_sol = fsolve(lambda x: self.f(x, mrold=mr_old), mr_new)
+                    m_new[idx] = torch.tensor(mr_sol[:3], dtype=m_new.dtype, device=m_new.device)
+                    r_new[idx] = torch.tensor(mr_sol[3:], dtype=r_new.dtype, device=r_new.device)
+        
+        self.mx, self.my, self.mz = m[:, 0], m[:, 1], m[:, 2]
+        self.rx, self.ry, self.rz = r[:, 0], r[:, 1], r[:, 2]
+
+        return (m, r)
 
 
 class HeavyTopNeural(HeavyTopCN):
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a HeavyTopNeural object with specified parameters and loads a neural
         network model based on the chosen method.
@@ -794,24 +1118,24 @@ class HeavyTopNeural(HeavyTopCN):
         :param method: The "method" parameter is used to specify the method for solving the equations of motion in the HeavyTopNeural class. It can take one of the following values:, defaults to without (optional)
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and angular momentum calculations
         """
-        super(HeavyTopNeural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz)
+        super(HeavyTopNeural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, device=device)
         # Load network
         self.method = method
         if method == "soft":
-            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "without":
-            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/without_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "implicit":
             raise Exception("Implicit solver not yet implemented for HT.")
-            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()
-            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J')
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
             self.J_net.eval()
             def L_net(z):
                 L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
@@ -829,15 +1153,15 @@ class HeavyTopNeural(HeavyTopCN):
         :param z: The parameter `z` is the input to the `neural_zdot` function. It is expected to be a numerical value or an array-like object that can be converted to a tensor
         :return: The function `neural_zdot` returns the variable `hamiltonian`.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
+        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         En = self.energy_net(z_tensor)
 
         E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
         E_z = torch.flatten(E_z)
 
         if self.method == "soft" or self.method == "without":
-            L = self.L_net(z_tensor).detach().numpy()[0]
-            hamiltonian = np.matmul(L, E_z.detach().numpy())
+            L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+            hamiltonian = np.matmul(L, E_z.detach().cpu().numpy())
         else:
             raise Exception("Implicit not implemented for HT yet.")
             J, cass = self.J_net(z_tensor)
@@ -846,7 +1170,7 @@ class HeavyTopNeural(HeavyTopCN):
 
         return hamiltonian
 
-    def f(self, mrNew):#defines the function f zero of which is sought
+    def f(self, mrNew, mrOld = None):#defines the function f zero of which is sought
         """
         The function `f` calculates the difference between the old and new values of `mr` and adds the
         average of the neural network outputs for the old and new values multiplied by the time step.
@@ -854,12 +1178,12 @@ class HeavyTopNeural(HeavyTopCN):
         :param mrNew: mrNew is a list containing the new values for the variables mx, my, mz, rx, ry, and rz
         :return: the result of the calculation, which is stored in the variable "res".
         """
-
-        mOld = [self.mx, self.my, self.mz]
-        rOld = self.r
-        mrOld = np.concatenate([mOld, rOld])
-        mNew = [mrNew[0], mrNew[1], mrNew[2]]
-        rNew = [mrNew[3], mrNew[4], mrNew[5]]
+        if mrOld is None:
+            mOld = [self.mx, self.my, self.mz]
+            rOld = self.r
+            mrOld = np.concatenate([mOld, rOld])
+        #mNew = [mrNew[0], mrNew[1], mrNew[2]]
+        #rNew = [mrNew[3], mrNew[4], mrNew[5]]
 
         zdo = self.neural_zdot(mrOld)
         zd = self.neural_zdot(mrNew)
@@ -876,9 +1200,10 @@ class HeavyTopNeural(HeavyTopCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this tensor during backprop
         :return: the value of `cass` as a NumPy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        J, cass = self.J_net(z_tensor)
-        return cass.detach().numpy()
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        z.requires_grad_(True)
+        J, cass = self.J_net(z)
+        return cass
 
     def get_L(self, z):
         """
@@ -888,8 +1213,8 @@ class HeavyTopNeural(HeavyTopCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        L = self.L_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        L = self.L_net(z)
         return L
 
     def get_E(self, z):
@@ -900,29 +1225,53 @@ class HeavyTopNeural(HeavyTopCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        E = self.energy_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        E = self.energy_net(z)
         return E
+    
+    def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
+        mr_old = torch.stack([self.mx, self.my, self.mz, self.rx, self.ry, self.rz], dim=1)
+        mr = mr_old.clone()
+        mr.requires_grad_(True)
 
-    #@tf.function
-    def m_new(self, with_entropy = False): #return new m and update RB
-        """
-        The function `m_new` calculates new values for `mx`, `my`, `mz`, and `r` based on the current values
-        and returns the updated values.
+        En = self.energy_net(mr)
+        E_z = torch.autograd.grad(En.sum(), mr, only_inputs=True, retain_graph=True)[0]
         
-        :param with_entropy: The `with_entropy` parameter is a boolean flag that determines whether or not to include entropy in the calculation. If `with_entropy` is set to `True`, entropy will be included in the calculation. If `with_entropy` is set to `False` (default), entropy will not be included, defaults to False (optional)
-        :return: The function `m_new` returns a tuple containing the updated values of `mx`, `my`, `mz` (momefield components) and `r` (position vector).
-        """
-        #calculate
-        mr_new = fsolve(self.f, (self.mx, self.my, self.mz, self.r[0], self.r[1], self.r[2]))
+        L = self.L_net(mr)
+        zdo = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
 
-        # update
-        self.mx = mr_new[0]
-        self.my = mr_new[1]
-        self.mz = mr_new[2]
-        self.r = [mr_new[3], mr_new[4], mr_new[5]]
+        for _ in range(solver_iterations):
+            mr_prev = mr.clone()
 
-        return ((self.mx, self.my, self.mz), self.r)
+            mr.requires_grad_(True)
+            En = self.energy_net(mr)
+            E_z = torch.autograd.grad(En.sum(), mr, only_inputs=True, retain_graph=True)[0]
+
+            L = self.L_net(mr)
+            zd = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
+
+            mr = mr_old + self.dt * (zdo + zd) / 2
+
+            rel_error = torch.norm(mr - mr_prev, dim =1) / (torch.norm(mr_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                mr_new_np = mr.detach().cpu().numpy()
+                mr_old_np = mr_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    mr_sol = fsolve(lambda x: self.f(x, mrOld=mr_old_np[idx]), mr_new_np[idx])
+                    mr[idx] = torch.tensor(mr_sol, dtype=mr_old.dtype, device=mr_old.device)
+
+        self.mx, self.my, self.mz = mr[:, 0], mr[:, 1], mr[:, 2]
+        self.rx, self.ry, self.rz = mr[:, 3], mr[:, 4], mr[:, 5]
+
+        return mr[:, :3], mr[:, 3:] 
 
 # The `HeavyTopNeuralIMR` class is a subclass of `HeavyTopNeural` that defines a function `f` which
 # calculates the difference between old and new values of `mr` and adds the product of `dt` and the
@@ -948,8 +1297,48 @@ class HeavyTopNeuralIMR(HeavyTopNeural):
 
         return res
 
+    def m_new(self, with_entropy = False, solver_iterations=300, tol=1e-6):
+        mr_old = torch.stack([self.mx, self.my, self.mz, self.rx, self.ry, self.rz], dim=1)
+        mr = mr_old.clone()
+
+        for _ in range(solver_iterations):
+            mr_prev = mr.clone()
+
+            mr_mid = 0.5 * (mr_old + mr)
+            mr_mid.requires_grad_(True)
+            
+            En = self.energy_net(mr_mid)
+            E_z = torch.autograd.grad(En.sum(), mr_mid, only_inputs=True, retain_graph=True)[0]
+
+            L = self.L_net(mr_mid)
+            zd = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
+
+            mr = mr_old + self.dt * zd
+
+            rel_error = torch.norm(mr - mr_prev, dim =1) / (torch.norm(mr_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+            
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                mr_new_np = mr.detach().cpu().numpy()
+                mr_old_np = mr_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    mr_sol = fsolve(lambda x: self.f(x, mrOld=mr_old_np[idx]), mr_new_np[idx])
+                    mr[idx] = torch.tensor(mr_sol, dtype=mr_old.dtype, device=mr_old.device)
+
+        self.mx, self.my, self.mz = mr[:, 0], mr[:, 1], mr[:, 2]
+        self.rx, self.ry, self.rz = mr[:, 3], mr[:, 4], mr[:, 5]
+
+        return mr[:, :3], mr[:, 3:]
+
 class Particle3DCN(object): #Crank-Nicolson
-    def __init__(self, M, dt, alpha, init_rx,  init_ry,  init_rz, init_mx, init_my, init_mz):
+    def __init__(self, M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my,
         and init_mz.
@@ -965,10 +1354,14 @@ class Particle3DCN(object): #Crank-Nicolson
         :param init_mz: The parameter `init_mz` represents the initial value of the momentum component in the z-direction
         """
         self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
-        self.r = np.array((init_rx, init_ry, init_rz))
-        self.p = np.array((init_mx, init_my, init_mz))
+        # self.r = np.array((init_rx, init_ry, init_rz))
+        self.r = torch.stack([init_rx, init_ry, init_rz], dim=1)
+        #self.p = np.array((init_mx, init_my, init_mz))
+        self.p = torch.stack([init_mx, init_my, init_mz], dim=1)
         self.alpha = alpha
         self.dt = dt
+
+        self.device = device
 
     def get_E(self, m):
         """
@@ -978,25 +1371,30 @@ class Particle3DCN(object): #Crank-Nicolson
         :param m: The parameter `m` is a list or tuple containing six elements. The elements represent the values of `m[0]`, `m[1]`, `m[2]`, `m[3]`, `m[4]`, and `m[5]`, where the first three give the position while the latter three position
         :return: The function `get_E` returns the value of the expression `0.5*(m[3]**2 + m[4]**2 + m[5]**2)/self.M + 0.5 *self.alpha * (m[0]**2 + m[1]**2 + m[2]**2)`.
         """
-        return 0.5*(m[3]**2 + m[4]**2 + m[5]**2)/self.M + 0.5 *self.alpha * (m[0]**2 + m[1]**2 + m[2]**2)
+        return 0.5*(m[:, 3]**2 + m[:, 4]**2 + m[:, 5]**2)/self.M + 0.5 *self.alpha * (m[:, 0]**2 + m[:, 1]**2 + m[:, 2]**2)
 
-    def get_L(self, m = (0.0, 0.0, 0.0)):
+    def get_L(self, m):
         """
         The function `get_L` returns a 6x6 numpy array representing a transformation matrix.
         
         :param m: The parameter `m` is a tuple with three elements representing the x, y, and z coordinates respectively. The default value for `m` is (0.0, 0.0, 0.0)
         :return: The function `get_L` returns a 6x6 numpy array `L` with the following values:
         """
-        L = np.array([
-            [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
-            [-1.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, -1.0, 0.0, 0.0, 0.0]])
+        B = m.shape[0]
+        zeros = torch.zeros((B,), dtype=m.dtype, device=m.device)
+        ones  = torch.ones((B,), dtype=m.dtype, device=m.device)
+
+        L = torch.stack([
+            torch.stack([zeros, zeros, zeros,  ones, zeros, zeros], dim=1),
+            torch.stack([zeros, zeros, zeros, zeros,  ones, zeros], dim=1),
+            torch.stack([zeros, zeros, zeros, zeros, zeros,  ones], dim=1),
+            torch.stack([-ones, zeros, zeros, zeros, zeros, zeros], dim=1),
+            torch.stack([zeros, -ones, zeros, zeros, zeros, zeros], dim=1),
+            torch.stack([zeros, zeros, -ones, zeros, zeros, zeros], dim=1),
+        ], dim=1)
         return L
 
-    def f(self, rpNew):#defines the function f zero of which is sought
+    def f(self, rpNew, rpOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residual of a given set of input parameters `rpNew` by performing a
         series of mathematical operations.
@@ -1004,10 +1402,11 @@ class Particle3DCN(object): #Crank-Nicolson
         :param rpNew: The parameter `rpNew` is a list or array containing the new values of `r` and `p`. It should have a length of 6, where the first 3 elements represent the new values of `r` and the last 3 elements represent the new values of `p`
         :return: a tuple containing the values of `rpres[0]`, `rpres[1]`, `rpres[2]`, `rpres[3]`, `rpres[4]`, and `rpres[5]`.
         """
-        rpOld = np.array([self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]])
+        if rpOld is None:
+            rpOld = np.array([self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]])
         #dEOld = np.concatenate([self.p/self.M, self.alpha*self.r])
         #rmdot = self.get_L(rpOld).dot(dEOld)
-        rmdot = np.concatenate([self.p/self.M, -self.alpha*self.r])
+        rmdot = np.concatenate([rpOld[3:6]/self.M, -self.alpha*rpOld[0:3]])
         #print("rmdot=",rmdot)
 
         #Hamiltionian part t+1
@@ -1020,34 +1419,46 @@ class Particle3DCN(object): #Crank-Nicolson
         return (rpres[0], rpres[1], rpres[2], rpres[3], rpres[4], rpres[5]) 
         #return rpres
 
-    def m_new(self): #return new r and p
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
         """
         The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
         the updated values.
 
         :return: The function `m_new` returns a tuple containing two tuples. The first tuple contains the values `(rx, ry, rz)` and the second tuple contains the values `(px, py, pz)`.
         """
-        #calculate
-        #(self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]) = fsolve(self.f, (self.r[0], self.r[0], self.r[0], self.p[0], self.p[1], self.p[2]))
-        (rx, ry, rz, px, py, pz) = fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
-        self.r[0] = rx
-        self.r[1] = ry
-        self.r[2] = rz
-        self.p[0] = px
-        self.p[1] = py
-        self.p[2] = pz
-        #forward Euler:
-        #rpOld = np.concatenate([self.r, self.p])
-        #dEOld = np.concatenate([self.p/self.M, self.alpha*self.r])
-        #print("deOld = ", dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(dEOld)
-        #rp = rpOld + self.dt*self.get_L(rpOld).dot(np.ones(6))
-        #self.r = rp[0:3]
-        #self.p = rp[3:6]
-        #print(self.r)
-        #print(self.p)
+        rp_old = torch.cat([self.r, self.p], dim=1)
+        rp_new = rp_old.clone()
 
-        return ((rx, ry, rz), (px, py, pz))
+        rmdot_old = torch.cat([self.p/self.M, -self.alpha*self.r], dim=1)
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+
+            rmdot_new = torch.cat([rp_new[:, 3:6]/self.M, -self.alpha*rp_new[:, 0:3]], dim=1)
+
+            rp_new = rp_old + self.dt/2*(rmdot_old + rmdot_new)
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:3]
+        self.p = rp_new[:, 3:6]
+        
+        return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DIMR(Particle3DCN):
     def f(self, rpNew):#defines the function f zero of which is sought
@@ -1064,10 +1475,50 @@ class Particle3DIMR(Particle3DCN):
 
         rpres = rpOld-rpNew + self.dt*rmdot
 
-        return (rpres[0], rpres[1], rpres[2], rpres[3], rpres[4], rpres[5]) 
+        return (rpres[0], rpres[1], rpres[2], rpres[3], rpres[4], rpres[5])
+    
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
+        """
+        The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
+        the updated values.
+
+        :return: The function `m_new` returns a tuple containing two tuples. The first tuple contains the values `(rx, ry, rz)` and the second tuple contains the values `(px, py, pz)`.
+        """
+        rp_old = torch.cat([self.r, self.p], dim=1)
+        rp_new = rp_old.clone()
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+            rp_mid = 0.5*(rp_old + rp_new)
+            
+            rmdot = torch.cat([rp_mid[:, 3:6]/self.M, -self.alpha*rp_mid[:, 0:3]], dim=1)
+
+            rp_new = rp_old + self.dt/2*rmdot
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:3]
+        self.p = rp_new[:, 3:6]
+        
+        return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DNeural(Particle3DCN):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry,  init_rz, init_mx, init_my, init_mz, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry,  init_rz, init_mx, init_my, init_mz, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a Particle3DNeural object with specified parameters and loads a neural
         network based on the chosen method.
@@ -1084,24 +1535,24 @@ class Particle3DNeural(Particle3DCN):
         :param method: The "method" parameter is used to specify the method for solving the equations of motion for the Particle3DNeural object. There are three possible values for this parameter:, defaults to without (optional)
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and L (angular momentum) calculations
         """
-        super(Particle3DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz)
+        super(Particle3DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device=device)
         # Load network
         self.method = method
         if method == "soft":
-            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "without":
-            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/without_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "implicit":
             raise Exception("Implicit solver not yet implemented for P3D.")
-            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()
-            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J')
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
             self.J_net.eval()
             def L_net(z):
                 L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
@@ -1109,6 +1560,7 @@ class Particle3DNeural(Particle3DCN):
             self.L_net = L_net
         else:
             raise Exception("Unkonown method: ", method)
+        self.device = next(self.energy_net.parameters()).device
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -1119,15 +1571,15 @@ class Particle3DNeural(Particle3DCN):
         :param z: The parameter `z` is a tensor representing the input to the neural network. It is of type `torch.Tensor` and has a shape determined by the specific neural network architecture being used
         :return: the Hamiltonian, which is a scalar value representing the energy of the system.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
+        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         En = self.energy_net(z_tensor)
 
         E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
         E_z = torch.flatten(E_z)
 
         if self.method == "soft" or self.method == "without":
-            L = self.L_net(z_tensor).detach().numpy()[0]
-            hamiltonian = np.matmul(L, E_z.detach().numpy())
+            L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+            hamiltonian = np.matmul(L, E_z.detach().cpu().numpy())
         else:
             raise Exception("Implicit not implemented for P3D yet.")
             J, cass = self.J_net(z_tensor)
@@ -1162,9 +1614,11 @@ class Particle3DNeural(Particle3DCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this tensor during backprop
         :return: the value of `cass` as a NumPy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        J, cass = self.J_net(z_tensor)
-        return cass.detach().numpy()
+        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #J, cass = self.J_net(z_tensor)
+        #return cass.detach().cpu().numpy()
+        J, cass = self.J_net(z)
+        return cass
 
     def get_L(self, z):
         """
@@ -1174,8 +1628,9 @@ class Particle3DNeural(Particle3DCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed with respect
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        L = self.L_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+        L = self.L_net(z)
         return L
 
     def get_E(self, z):
@@ -1186,29 +1641,63 @@ class Particle3DNeural(Particle3DCN):
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        E = self.energy_net(z_tensor).detach().numpy()[0]
+        # z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #E = self.energy_net(z_tensor).detach().cpu().numpy()[0]
+        E = self.energy_net(z)
         return E
 
     #@tf.function
-    def m_new(self): #return new r and p
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
         """
         The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
         them as a tuple.
 
         :return: a tuple containing the updated values of `self.r` and `self.p`.
         """
-        #calculate
-        (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2])= fsolve(self.f, (self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]))
+        rp_old = torch.cat([self.r, self.p], dim=1).requires_grad_(True)
+        rp_new = rp_old.clone()
 
-        # update
-        #self.r = rpNew[0:3]
-        #self.p = rpNew[3:5]
+        En_old = self.energy_net(rp_old)
+        E_z_old = torch.autograd.grad(En_old.sum(), rp_old, only_inputs=True, retain_graph=True)[0]
+        
+        L = self.L_net(rp_old)
+        zd_old = torch.bmm(L, E_z_old.unsqueeze(-1)).squeeze(-1)
 
-        return ((self.r[0], self.r[1], self.r[2]), (self.p[0], self.p[1], self.p[2]))
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+
+            En_new = self.energy_net(rp_new)
+            E_z_new = torch.autograd.grad(En_new.sum(), rp_new, only_inputs=True, retain_graph=True)[0]
+
+            L = self.L_net(rp_old)
+            zd_new = torch.bmm(L, E_z_new.unsqueeze(-1)).squeeze(-1)
+
+            rp_new = rp_old + self.dt/2*(zd_new + zd_old)
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:3]
+        self.p = rp_new[:, 3:6]
+
+        return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DNeuralIMR(Particle3DNeural):
-    def f(self, rpNew):#defines the function f zero of which is sought
+    def f(self, rpNew, rpOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residual between the old and new values of `rp` and the time
         derivative of `z` using the midpoint method.
@@ -1216,7 +1705,8 @@ class Particle3DNeuralIMR(Particle3DNeural):
         :param rpNew: rpNew is a numpy array that represents the new values of the variables r and p
         :return: the value of the variable "res".
         """
-        rpOld = np.concatenate([self.r, self.p])
+        if rpOld is None:
+            rpOld = np.concatenate([self.r, self.p])
         rp_mid = 0.5*(np.array(rpNew)+rpOld)
 
         zd = self.neural_zdot(rp_mid)
@@ -1224,16 +1714,62 @@ class Particle3DNeuralIMR(Particle3DNeural):
         res = np.array(rpOld) - np.array(rpNew) + self.dt*zd
 
         return res
+    
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
+        """
+        The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
+        them as a tuple.
+
+        :return: a tuple containing the updated values of `self.r` and `self.p`.
+        """
+        rp_old = torch.cat([self.r, self.p], dim=1)
+        rp_new = rp_old.clone()
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+
+            rp_mid = 0.5*(rp_new + rp_old).requires_grad_(True)
+
+            En_mid = self.energy_net(rp_mid)
+            E_z_mid = torch.autograd.grad(En_mid.sum(), rp_mid, only_inputs=True, retain_graph=True)[0]
+
+            L = self.L_net(rp_mid)
+            zd_new = torch.bmm(L, E_z_mid.unsqueeze(-1)).squeeze(-1)
+
+            rp_new = rp_old + self.dt*zd_new
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:3]
+        self.p = rp_new[:, 3:6]
+
+        return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle3DKeplerIMR(Particle3DIMR):
-    def f(self, rpNew):#defines the function f zero of which is sought
+    def f(self, rpNew, rpOld=None):#defines the function f zero of which is sought
         """
         The function f calculates the residual of a given set of inputs and returns it as a tuple.
         
         :param rpNew: The parameter `rpNew` is a numpy array that represents the new values of position and momentum. It has a shape of (6,) and contains the following elements:
         :return: a tuple containing the values of `rpres[0]`, `rpres[1]`, `rpres[2]`, `rpres[3]`, `rpres[4]`, and `rpres[5]`.
         """
-        rpOld = np.array([self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]])
+        if rpOld is None:
+            rpOld = np.array([self.r[0], self.r[1], self.r[2], self.p[0], self.p[1], self.p[2]])
         rp_mid = 0.5*(np.array(rpNew)+rpOld)
         r_mid = rp_mid[0:3]
         rmdot = np.concatenate([rp_mid[3:6]/self.M, -self.alpha*r_mid/(np.dot(r_mid, r_mid)**(1.5)+1.0e-06)])
@@ -1241,9 +1777,54 @@ class Particle3DKeplerIMR(Particle3DIMR):
         rpres = rpOld-rpNew + self.dt*rmdot
 
         return (rpres[0], rpres[1], rpres[2], rpres[3], rpres[4], rpres[5]) 
+    
+    def m_new(self, solver_iterations=300, tol=1e-6): #return new r and p
+        """
+        The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
+        the updated values.
+
+        :return: The function `m_new` returns a tuple containing two tuples. The first tuple contains the values `(rx, ry, rz)` and the second tuple contains the values `(px, py, pz)`.
+        """
+        rp_old = torch.cat([self.r, self.p], dim=1)
+        rp_new = rp_old.clone()
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+            rp_mid = 0.5*(rp_old + rp_new)
+
+            r_mid, p_mid = rp_mid[:, 0:3], rp_mid[:, 3:6]
+
+            r_norm_sq = (r_mid * r_mid).sum(dim=1, keepdim=True)
+            denom = (r_norm_sq.sqrt()**3 + 1.0e-6)
+            rmdot = torch.cat([p_mid / self.M,
+                            -self.alpha * r_mid / denom], dim=1)
+
+            rp_new = rp_old + self.dt*rmdot
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:3]
+        self.p = rp_new[:, 3:6]
+        
+        return rp_new[:, 0:3], rp_new[:, 3:6]
 
 class Particle2DIMR(object): #Implicit midpont rule
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_mx, init_my, and zeta.
         
@@ -1257,11 +1838,12 @@ class Particle2DIMR(object): #Implicit midpont rule
         :param zeta: The parameter zeta represents the damping coefficient in the system. It determines the rate at which the system loses energy due to damping. A higher value of zeta leads to faster energy dissipation and damping of the system.
         """
         self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
-        self.r = np.array((init_rx, init_ry))
-        self.p = np.array((init_mx, init_my))
+        self.r = torch.stack([init_rx, init_ry], dim=1)
+        self.p = torch.stack([init_mx, init_my], dim=1)
         self.alpha = alpha
         self.dt = dt
         self.zeta = zeta
+        self.device = device
 
     def get_E(self, m):
         """
@@ -1270,23 +1852,30 @@ class Particle2DIMR(object): #Implicit midpont rule
         :param m: The parameter `m` is a list or tuple containing four elements. The first two elements (`m[0]` and `m[1]`) represent the x and y components of the position vector, while the last two elements (`m[2]` and `m[3]`) represent the momentum.
         :return: the value of the expression 0.5*(m[2]**2 + m[3]**2)/self.M + 0.5 *self.alpha * (m[0]**2 + m[1]**2).
         """
-        return 0.5*(m[2]**2 + m[3]**2)/self.M + 0.5 *self.alpha * (m[0]**2 + m[1]**2)
+        return 0.5*(m[:, 2]**2 + m[:, 3]**2)/self.M + 0.5 *self.alpha * (m[:, 0]**2 + m[:, 1]**2)
 
-    def get_L(self, m = (0.0, 0.0, 0.0)):
+    def get_L(self, m):
         """
         The function `get_L` returns a 4x4 numpy array representing a transformation matrix.
         
         :param m: The parameter `m` is a tuple with three elements representing the x, y, and z coordinates respectively. The default value for `m` is (0.0, 0.0, 0.0)
         :return: a 4x4 numpy array called L.
         """
-        L = np.array([
-            [0.0, 0.0, 1.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-            [-1.0, 0.0, 0.0, 0.0],
-            [0.0, -1.0, 0.0, 0.0]])
+        B = m.shape[0]
+        
+        zeros = torch.zeros((B,), dtype=m.dtype, device=m.device)
+        ones  = torch.ones((B,), dtype=m.dtype, device=m.device)
+
+        L = torch.stack([
+            torch.stack([zeros, zeros,  ones, zeros], dim=1),
+            torch.stack([zeros, zeros, zeros,  ones], dim=1),
+            torch.stack([-ones, zeros, zeros, zeros], dim=1),
+            torch.stack([zeros, -ones, zeros, zeros], dim=1),
+        ], dim=1)
+
         return L
 
-    def f(self, rpNew):#defines the function f zero of which is sought
+    def f(self, rpNew, rpOld=None):#defines the function f zero of which is sought
         """
         The function f calculates the residual of the difference between the old and new values of r and p,
         taking into account various factors such as mass, dissipation, and time step.
@@ -1294,7 +1883,8 @@ class Particle2DIMR(object): #Implicit midpont rule
         :param rpNew: The parameter `rpNew` is a numpy array containing the new values of position and momentum. It has the form `[x_new, y_new, px_new, py_new]`
         :return: a tuple containing the values of `rpres[0]`, `rpres[1]`, `rpres[2]`, and `rpres[3]`.
         """
-        rpOld = np.array([self.r[0], self.r[1], self.p[0], self.p[1]])
+        if rpOld is None:
+            rpOld = np.array([self.r[0], self.r[1], self.p[0], self.p[1]])
         rp_mid = 0.5*(np.array(rpNew)+rpOld)
         rmdot = np.concatenate([rp_mid[2:4]/self.M, -self.alpha*rp_mid[0:2]])
         rmdot += -self.zeta*np.array((0.0, 0.0, rp_mid[2], rp_mid[3])) #dissipation
@@ -1302,20 +1892,48 @@ class Particle2DIMR(object): #Implicit midpont rule
         rpres = rpOld-rpNew + self.dt*rmdot
         return (rpres[0], rpres[1], rpres[2], rpres[3]) 
 
-    def m_new(self): #return new r and p
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
         """
         The function `m_new` returns new values for `r` and `p` by solving a system of equations using the `fsolve` function.
         :return: a tuple containing two tuples. The first tuple contains the values of `rx` and `ry`, and the second tuple contains the values of `px` and `py`.
         """
-        (rx, ry, px, py) = fsolve(self.f, (self.r[0], self.r[1], self.p[0], self.p[1]))
-        self.r[0] = rx
-        self.r[1] = ry
-        self.p[0] = px
-        self.p[1] = py
-        return ((rx, ry), (px, py))
+        rp_old = torch.cat([self.r, self.p], dim=1)
+
+        rp_new = rp_old.clone()
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+
+            rp_mid = 0.5*(rp_new + rp_old)
+            rmdot = torch.cat([rp_mid[:, 2:4]/self.M, -self.alpha*rp_mid[:, 0:2]], dim=1)
+            rmdot += -self.zeta * torch.cat([torch.zeros_like(rp_mid[:, 0:2]), rp_mid[:, 2:4]], dim=1)
+
+            rp_new = rp_old + self.dt*rmdot
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:2]
+        self.p = rp_new[:, 2:4]
+
+        return rp_new[:, 0:2], rp_new[:, 2:4]
 
 class Particle2DNeural(Particle2DIMR):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_mx, init_my, zeta, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a Particle2DNeural object with specified parameters and loads a neural
         network based on the chosen method.
@@ -1331,24 +1949,24 @@ class Particle2DNeural(Particle2DIMR):
         :param method: The "method" parameter is used to specify the method for solving the equations of motion in the Particle2DNeural class. It can take one of the following values:, defaults to without (optional)
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. 
         """
-        super(Particle2DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_mx, init_my, zeta)
+        super(Particle2DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_mx, init_my, zeta, device=device)
         # Load network
         self.method = method
         if method == "soft":
-            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "without":
-            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/without_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "implicit":
             raise Exception("Implicit solver not yet implemented for P3D.")
-            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()
-            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J')
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
             self.J_net.eval()
             def L_net(z):
                 L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
@@ -1364,15 +1982,15 @@ class Particle2DNeural(Particle2DIMR):
         
         :param z: The parameter `z` is a tensor representing the input to the neural network. It is of type `torch.Tensor` and has a shape determined by the specific neural network architecture being used.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
+        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         En = self.energy_net(z_tensor)
 
         E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
         E_z = torch.flatten(E_z)
 
         if self.method == "soft" or self.method == "without":
-            L = self.L_net(z_tensor).detach().numpy()[0]
-            hamiltonian = np.matmul(L, E_z.detach().numpy())
+            L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+            hamiltonian = np.matmul(L, E_z.detach().cpu().numpy())
         else:
             raise Exception("Implicit not implemented for P2D yet.")
             J, cass = self.J_net(z_tensor)
@@ -1380,7 +1998,7 @@ class Particle2DNeural(Particle2DIMR):
             hamiltonian = np.cross(J, E_z.detach().numpy())
         return hamiltonian
 
-    def f(self, rpNew):#defines the function f zero of which is sought
+    def f(self, rpNew, rpOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residual between the old and new values of `rp` and the time
         derivative of `z`.
@@ -1388,7 +2006,8 @@ class Particle2DNeural(Particle2DIMR):
         :param rpNew: The parameter `rpNew` represents the new values of `r` and `p` that are being passed to the function `f`
         :return: the value of the variable "res".
         """
-        rpOld = np.concatenate([self.r, self.p])
+        if rpOld is None:
+            rpOld = np.concatenate([self.r, self.p])
         rp_mid = 0.5*(np.array(rpNew)+rpOld)
 
         zd = self.neural_zdot(rp_mid)
@@ -1403,9 +2022,8 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this tensor during backprop
         :return: The function `get_cass` returns the value of `cass` as a NumPy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        J, cass = self.J_net(z_tensor)
-        return cass.detach().numpy()
+        J, cass = self.J_net(z)
+        return cass
 
     def get_L(self, z):
         """
@@ -1415,8 +2033,7 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. 
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        L = self.L_net(z_tensor).detach().numpy()[0]
+        L = self.L_net(z)
         return L
 
     def get_E(self, z):
@@ -1427,23 +2044,56 @@ class Particle2DNeural(Particle2DIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        E = self.energy_net(z_tensor).detach().numpy()[0]
+        E = self.energy_net(z)
         return E
 
-    def m_new(self): #return new r and p
+    def m_new(self, solver_iterations=200, tol=1e-6): #return new r and p
         """
         The function `m_new` calculates new values for `r` and `p` using the `fsolve` function and returns
         the updated values.
         :return: a tuple containing two tuples. The first tuple contains the values of `self.r[0]` and `self.r[1]`, and the second tuple contains the values of `self.p[0]` and `self.p[1]`.
         """
-        #calculate
-        (self.r[0], self.r[1], self.p[0], self.p[1])= fsolve(self.f, (self.r[0], self.r[1], self.p[0], self.p[1]))
+        rp_old = torch.cat([self.r, self.p], dim=1)
 
-        return ((self.r[0], self.r[1]), (self.p[0], self.p[1]))
+        rp_new = rp_old.clone()
+
+        for _ in range(solver_iterations):
+            rp_prev = rp_new.clone()
+
+            rp_mid = 0.5*(rp_new + rp_old).requires_grad_(True)
+            
+            En = self.energy_net(rp_mid)
+            E_z = torch.autograd.grad(En.sum(), rp_mid, only_inputs=True, retain_graph=True)[0]
+            L = self.L_net(rp_mid)
+            zd = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
+
+            rp_new = rp_old + self.dt*zd
+
+            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                rp_new_np = rp_new.detach().cpu().numpy()
+                rp_old_np = rp_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
+                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
+
+        self.r = rp_new[:, 0:2]
+        self.p = rp_new[:, 2:4]
+
+        return rp_new[:, 0:2], rp_new[:, 2:4]
+
 
 class ShivamoggiIMR(object):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, and init_u.
         
@@ -1457,9 +2107,10 @@ class ShivamoggiIMR(object):
         """
         self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
         self.u = init_u
-        self.x = np.array((init_rx, init_ry, init_rz))
+        self.x = torch.stack((init_rx, init_ry, init_rz), dim=1)
         self.alpha = alpha
         self.dt = dt
+        self.device = device
 
     def get_E(self, m):
         """
@@ -1468,7 +2119,7 @@ class ShivamoggiIMR(object):
         :param m: The parameter `m` is a list or tuple containing four elements
         :return: the value of m[3]**2 + m[0]**2 - m[2]**2.
         """
-        return m[3]**2 + m[0]**2 - m[2]**2
+        return m[:, 3]**2 + m[:, 0]**2 - m[:, 2]**2
 
     def get_UV(self, m):
         """
@@ -1477,11 +2128,16 @@ class ShivamoggiIMR(object):
         :param m: The parameter `m` is a list containing four elements: `u`, `x`, `y`, and `z`
         :return: The function `get_UV` returns a tuple of two tuples. The first tuple contains three values: 0.0, 2*u*(x+z), and 0.0. The second tuple contains three values: x, 0, and -z.
         """
-        u = m[0]
-        x = m[1]
-        y = m[2]
-        z = m[3]
-        return (0.0, 2*u*(x+z), 0.0), (x, 0, -z)
+        u = m[:, 0]
+        x = m[:, 1]
+        y = m[:, 2]
+        z = m[:, 3]
+        zeros = torch.zeros_like(u, dtype=m.dtype, device=m.device)
+        #return (0.0, 2*u*(x+z), 0.0), (x, 0, -z)
+
+        U = torch.cat([zeros.unsqueeze(-1), (2*u*(x+z)).unsqueeze(-1), zeros.unsqueeze(-1)], dim=1)
+        V = torch.cat([x.unsqueeze(-1), zeros.unsqueeze(-1), (-z).unsqueeze(-1)], dim=1)
+        return U, V
 
     def get_L(self, m = (0.0, 0.0, 0.0, 0.0)):
         """
@@ -1491,14 +2147,25 @@ class ShivamoggiIMR(object):
         :return: a 4x4 numpy array called L.
         """
         U, V = self.get_UV(m)
-        L = np.array([
+        """L = np.array([
             [0.0, -U[0], -U[1], -U[2]],
             [U[0], 0.0, -V[2], V[1]],
             [U[1], V[2], 0.0, -V[0]],
-            [U[2], -V[1], V[0], 0.0]])/(m[0]+m[3])
+            [U[2], -V[1], V[0], 0.0]])/(m[0]+m[3])"""
+        zeros = torch.zeros_like(U[:,0], dtype=U.dtype, device=U.device)
+        L = torch.stack([
+            torch.stack([zeros, -U[:,0], -U[:,1], -U[:,2]], dim=1),
+            torch.stack([ U[:,0], zeros, -V[:,2],  V[:,1]], dim=1),
+            torch.stack([ U[:,1],  V[:,2], zeros, -V[:,0]], dim=1),
+            torch.stack([ U[:,2], -V[:,1],  V[:,0], zeros], dim=1)
+        ], dim=1)
+        
+        denom = (m[:,0] + m[:,3]).unsqueeze(-1).unsqueeze(-1)
+        denom = denom + 1e-12 * torch.sign(denom)
+        L = L / denom
         return L
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the residual of a given input `mNew` by performing a series of
         mathematical operations.
@@ -1506,115 +2173,198 @@ class ShivamoggiIMR(object):
         :param mNew: The parameter `mNew` is a list or array containing four values
         :return: a tuple containing the values of mres[0], mres[1], mres[2], and mres[3].
         """
-        mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
+        if mOld is None:
+            mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
         m_mid = 0.5*(np.array(mNew)+mOld)
         mdot = np.array([-m_mid[0]*m_mid[2], m_mid[3]*m_mid[2], m_mid[3]*m_mid[1]-m_mid[0]**2, m_mid[1]*m_mid[2]])
 
         mres = mOld-mNew + self.dt*mdot
         return (mres[0], mres[1], mres[2], mres[3]) 
 
-    def m_new(self): #return new r and p
-        """
+    """def m_new(self, solver_iterations=300, tol=1e-8): #return new r and p
+        ""
         The function `m_new` returns new values for `u`, `x[0]`, `x[1]`, and `x[2]` by solving the equation
         `f(u, x[0], x[1], x[2]) = 0` using the `fsolve` function.
         :return: a tuple containing the values of u, x, y, and z.
-        """
-        (u, x, y, z) = fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
+        ""
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1).to(torch.float64)
+        um_new = um_old.clone()
+
+        for _ in range(solver_iterations):
+            um_prev = um_new.clone()
+
+            um_mid = 0.5*(um_old + um_new)
+
+            umdot = torch.stack([-um_mid[:, 0]*um_mid[:, 2], um_mid[:, 3]*um_mid[:, 2],
+                                 um_mid[:, 3]*um_mid[:, 1]-um_mid[:, 0]**2, um_mid[:, 1]*um_mid[:, 2]], dim=1)
+
+            um_new = um_old + self.dt*umdot
+
+            rel_error = torch.norm(um_new - um_prev, dim=1) / (torch.norm(um_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                um_new_np = um_new.detach().cpu().numpy()
+                um_old_np = um_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    um_sol = fsolve(lambda x: self.f(x, mOld=um_old_np[idx]), um_new_np[idx])
+                    um_new[idx] = torch.tensor(um_sol, dtype=um_old.dtype, device=um_old.device)
+
+        ""(u, x, y, z) = fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
         self.u = u
         self.x[0] = x
         self.x[1] = y
         self.x[2] = z
-        return (u, x, y, z)
+        return (u, x, y, z)""
 
+        self.u = um_new[:, 0]
+        self.x = um_new[:, 1:4]
 
-class ShivamoggiIMR(object):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u):
-        """
-        The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, and init_u.
+        return um_new
+    
+    def f_torch(self, mNew, mOld):
+        m_mid = 0.5 * (mNew + mOld)
+        mdot = torch.stack([
+            -m_mid[:, 0] * m_mid[:, 2],
+            m_mid[:, 3] * m_mid[:, 2],
+            m_mid[:, 3] * m_mid[:, 1] - m_mid[:, 0]**2,
+            m_mid[:, 1] * m_mid[:, 2]
+        ], dim=1)
+        return mOld - mNew + self.dt * mdot
+
+    def m_new(self, solver_iterations=50, tol=1e-10):
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1)
+        um_new = um_old.clone()
+
+        for _ in range(solver_iterations):
+            um_new = um_new.clone().detach().requires_grad_(True)
+
+            batch_size = um_new.shape[0]
+            delta = torch.zeros_like(um_new)
+
+            for i in range(batch_size):
+                xi = um_new[i:i+1].detach().requires_grad_(True)
+                fi = self.f_torch(xi, um_old[i:i+1])
+                
+                Ji = torch.autograd.functional.jacobian(
+                    lambda x: self.f_torch(x, um_old[i:i+1]), xi).squeeze(0).squeeze(1)
+                
+                delta[i] = torch.linalg.solve(Ji, fi.squeeze(0).unsqueeze(-1)).squeeze(-1)
+
+            um_next = um_new - delta
+
+            rel_error = torch.norm(um_next - um_new, dim=1) / (torch.norm(um_new, dim=1) + 1e-12)
+            um_new = um_next.detach()
+
+            if torch.all(rel_error < tol):
+                break
+
+        self.u = um_new[:, 0]
+        self.x = um_new[:, 1:4]
+
+        return um_new"""
+    
+    def _mdot(self, m):
+        return torch.stack([
+            -m[:, 0] * m[:, 2],
+            m[:, 3] * m[:, 2],
+            m[:, 3] * m[:, 1] - m[:, 0]**2,
+            m[:, 1] * m[:, 2]
+        ], dim=1)
+
+    def _residual(self, mNew, mOld):
+        m_mid = 0.5 * (mNew + mOld)
+        mdot_val = self._mdot(m_mid)
+        return mOld - mNew + self.dt * mdot_val
+
+    def _jacobian(self, mNew, mOld):
+        # Jacobian: J = -I + (dt/2) * d(mdot)/d(m_mid)
+        m_mid = 0.5 * (mNew + mOld)
+        batch_size, dim = m_mid.shape
         
-        :param M: The parameter M represents the mass of the system. It is used in the Hamiltonian equation to calculate the kinetic energy term, which is given by 1/2 p^2/M, where p is the momentum of the system
-        :param dt: dt is the time step size used in numerical integration methods to update the system's state. It determines the granularity of the simulation and affects the accuracy and stability of the calculations. Smaller values of dt result in more accurate but slower simulations, while larger values of dt can lead to faster but less accurate
-        :param alpha: A parameter in the Shivamoggi equations
-        :param init_rx: The initial x-coordinate of the particle's position
-        :param init_ry: The parameter `init_ry` represents the initial value of the y-coordinate of the position vector
-        :param init_rz: The parameter `init_rz` represents the initial value of the z-coordinate of the position vector
-        :param init_u: The `init_u` parameter represents the initial momentum of the system. It is a vector that specifies the initial momentum in each direction (x, y, z)
-        """
-        self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
-        self.u = init_u
-        self.x = np.array((init_rx, init_ry, init_rz))
-        self.alpha = alpha
-        self.dt = dt
-
-    def get_E(self, m):
-        """
-        The function `get_E` calculates the value of E using the formula E = m[3]**2 + m[0]**2 - m[2]**2.
+        J_mdot = torch.zeros(batch_size, dim, dim, device=self.device)
+        m0, m1, m2, m3 = m_mid[:, 0], m_mid[:, 1], m_mid[:, 2], m_mid[:, 3]
         
-        :param m: The parameter `m` is a list or tuple containing four elements
-        :return: the value of m[3]**2 + m[0]**2 - m[2]**2.
-        """
-        return m[3]**2 + m[0]**2 - m[2]**2
-
-    def get_UV(self, m):
-        """
-        The function `get_UV` takes a list `m` as input and returns a tuple of two tuples, where the first
-        tuple is calculated based on the values of `u`, `x`, and `z` from `m`, and the second tuple is
-        calculated based on the value of `x` and `z` from `m`.
+        J_mdot[:, 0, 0] = -m2
+        J_mdot[:, 0, 2] = -m0
+        J_mdot[:, 1, 2] = m3
+        J_mdot[:, 1, 3] = m2
+        J_mdot[:, 2, 0] = -2 * m0
+        J_mdot[:, 2, 1] = m3
+        J_mdot[:, 2, 3] = m1
+        J_mdot[:, 3, 1] = m2
+        J_mdot[:, 3, 2] = m1
         
-        :param m: The parameter `m` is a list containing four elements: `u`, `x`, `y`, and `z`
-        :return: The function `get_UV` returns a tuple of two tuples. The first tuple contains three values: 0.0, 2*u*(x+z), and 0.0. The second tuple contains three values: x, 0, and -z.
-        """
-        u = m[0]
-        x = m[1]
-        y = m[2]
-        z = m[3]
-        return (0.0, 2*u*(x+z), 0.0), (x, 0, -z)
+        I = torch.eye(dim, device=self.device).expand(batch_size, -1, -1)
+        return -I + 0.5 * self.dt * J_mdot
 
-    def get_L(self, m = (0.0, 0.0, 0.0, 0.0)):
-        """
-        The function `get_L` calculates and returns a 4x4 matrix L based on the input parameter m.
+    def solve(self, mOld, max_iter=20, tol=1e-8):
+        mNew = mOld.clone()
+        converged_mask = torch.zeros(mOld.shape[0], dtype=torch.bool, device=self.device)
+
+        for i in range(max_iter):
+            if torch.all(converged_mask):
+                print(f"All systems converged in {i} iterations.")
+                return mNew
+            
+            active_mask = ~converged_mask
+            mNew_active, mOld_active = mNew[active_mask], mOld[active_mask]
+            
+            f_val_active = self._residual(mNew_active, mOld_active)
+            residual_norms_active = torch.linalg.norm(f_val_active, dim=1)
+            
+            newly_converged_mask = residual_norms_active < tol
+            converged_mask[active_mask] = newly_converged_mask
+            
+            update_mask = ~newly_converged_mask
+            if not torch.any(update_mask):
+                continue
+
+            mNew_update = mNew_active[update_mask]
+            mOld_update = mOld_active[update_mask]
+            f_val_update = f_val_active[update_mask]
+            residual_norms_update = residual_norms_active[update_mask]
+
+            J_val = self._jacobian(mNew_update, mOld_update)
+            delta_m = torch.linalg.solve(J_val, -f_val_update)
+
+            num_updates = mNew_update.shape[0]
+            alphas = torch.ones(num_updates, 1, device=self.device)
+            mNew_candidate = mNew_update + alphas * delta_m
+            
+            for _ in range(10):
+                new_norms = torch.linalg.norm(self._residual(mNew_candidate, mOld_update), dim=1)
+                worse_mask = new_norms > residual_norms_update
+                if not torch.any(worse_mask): break
+                alphas[worse_mask] *= 0.5
+                mNew_candidate[worse_mask] = mNew_update[worse_mask] + alphas[worse_mask] * delta_m[worse_mask]
+            
+            active_indices = torch.where(active_mask)[0]
+            update_indices = active_indices[update_mask]
+            mNew[update_indices] = mNew_candidate
+
+        if not torch.all(converged_mask):
+            print(f"Warning: Did not converge for all systems. ({torch.sum(converged_mask)}/{mOld.shape[0]} converged).")
+        return mNew
+    
+    def m_new(self, solver_iterations=300, tol=1e-6):
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1)
+        um_new = self.solve(um_old, max_iter=solver_iterations, tol=tol)
         
-        :param m: The parameter `m` is a tuple of four values `(m[0], m[1], m[2], m[3])`
-        :return: The function `get_L` returns a 4x4 numpy array.
-        """
-        U, V = self.get_UV(m)
-        L = np.array([
-            [0.0, -U[0], -U[1], -U[2]],
-            [U[0], 0.0, -V[2], V[1]],
-            [U[1], V[2], 0.0, -V[0]],
-            [U[2], -V[1], V[0], 0.0]])/(m[0]+m[3])
-        return L
-
-    def f(self, mNew):#defines the function f zero of which is sought
-        """
-        The function `f` calculates the residual of a given input `mNew` by performing a series of
-        mathematical operations.
+        self.u = um_new[:, 0].detach()
+        self.x = um_new[:, 1:4].detach()
         
-        :param mNew: The parameter `mNew` is a list or array containing the new values for `u`, `x[0]`, `x[1]`, and `x[2]`
-        :return: a tuple containing the values of mres[0], mres[1], mres[2], and mres[3].
-        """
-        mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
-        m_mid = 0.5*(np.array(mNew)+mOld)
-        mdot = np.array([-m_mid[0]*m_mid[2], m_mid[3]*m_mid[2], m_mid[3]*m_mid[1]-m_mid[0]**2, m_mid[1]*m_mid[2]])
+        return um_new.detach()
 
-        mres = mOld-mNew + self.dt*mdot
-        return (mres[0], mres[1], mres[2], mres[3]) 
-
-    def m_new(self): #return new r and p
-        """
-        The function `m_new` returns new values for `u`, `x[0]`, `x[1]`, and `x[2]` by solving the equation
-        `f(u, x[0], x[1], x[2]) = 0` using the `fsolve` function.
-        :return: a tuple containing the values of u, x, y, and z.
-        """
-        (u, x, y, z) = fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
-        self.u = u
-        self.x[0] = x
-        self.x[1] = y
-        self.x[2] = z
-        return (u, x, y, z)
 
 class ShivamoggiNeural(ShivamoggiIMR):
-    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, method = "without", name = DEFAULT_folder_name):
+    def __init__(self, M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device="cpu", method = "without", name = DEFAULT_folder_name):
         """
         The function initializes a ShivamoggiNeural object with specified parameters and loads the
         appropriate neural network models based on the chosen method.
@@ -1630,24 +2380,24 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param method: The "method" parameter in the code snippet refers to the method used for solving the Shivamoggi equations. There are three possible options:, defaults to without (optional)
         :param name: The `name` parameter is a string that represents the folder name where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. The `name` parameter is used to construct the file paths for loading the models
         """
-        super(ShivamoggiNeural, self).__init__(M, dt, alpha, init_rx,  init_ry, init_rz, init_u)
+        super(ShivamoggiNeural, self).__init__(M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device=device)
         # Load network
         self.method = method
         if method == "soft":
-            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "without":
-            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()   
-            self.L_net = torch.load(name+'/saved_models/without_jacobi_L')
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
             self.L_net.eval()
         elif method == "implicit":
             raise Exception("Implicit solver not yet implemented for Shivamoggi.")
-            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy')
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
             self.energy_net.eval()
-            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J')
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
             self.J_net.eval()
             def L_net(z):
                 L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
@@ -1665,15 +2415,15 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param z: The parameter `z` is a tensor representing the input to the neural network. It is of type `torch.Tensor` and has a shape determined by the dimensions of the input data
         :return: The function `neural_zdot` returns the variable `hamiltonian`.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
+        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
         En = self.energy_net(z_tensor)
 
         E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
         E_z = torch.flatten(E_z)
 
         if self.method == "soft" or self.method == "without":
-            L = self.L_net(z_tensor).detach().numpy()[0]
-            hamiltonian = np.matmul(L, E_z.detach().numpy())
+            L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+            hamiltonian = np.matmul(L, E_z.detach().cpu().numpy())
         else:
             raise Exception("Implicit not implemented for HT yet.")
             J, cass = self.J_net(z_tensor)
@@ -1681,7 +2431,7 @@ class ShivamoggiNeural(ShivamoggiIMR):
             hamiltonian = np.cross(J, E_z.detach().numpy())
         return hamiltonian
 
-    def f(self, mNew):#defines the function f zero of which is sought
+    def f(self, mNew, mOld=None):#defines the function f zero of which is sought
         """
         The function `f` calculates the difference between the old and new values of `m` and adds the
         product of the time step and the derivative of `z` to it.
@@ -1689,7 +2439,8 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param mNew: The parameter `mNew` represents the new values of `m` that are passed to the function `f`
         :return: the difference between the old values and the new values, plus the product of the time step and the derivative of the neural network with respect to the midpoint of the old and new values.
         """
-        mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
+        if mOld is None:
+            mOld = np.array([self.u, self.x[0], self.x[1], self.x[2]])
         m_mid = 0.5*(np.array(mNew)+mOld)
 
         zd = self.neural_zdot(m_mid)
@@ -1704,9 +2455,11 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed for this tensor during backprop
         :return: the value of `cass` as a NumPy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        J, cass = self.J_net(z_tensor)
-        return cass.detach().numpy()
+        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #J, cass = self.J_net(z_tensor)
+        #return cass.detach().cpu().numpy()
+        J, cass = self.J_net(z)
+        return cass
 
     def get_L(self, z):
         """
@@ -1716,8 +2469,9 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `L_net` neural network. It is converted to a tensor using `torch.tensor` with a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will be computed with respect
         :return: the value of L, which is obtained by passing the input z through the L_net neural network and converting the result to a numpy array.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        L = self.L_net(z_tensor).detach().numpy()[0]
+        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #L = self.L_net(z_tensor).detach().cpu().numpy()[0]
+        L = self.L_net(z)
         return L
 
     def get_E(self, z):
@@ -1728,11 +2482,12 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param z: The parameter `z` is a numerical input that is used as an input to the `energy_net` neural network. It is converted to a tensor using `torch.tensor` and is set to have a data type of `torch.float32`. The `requires_grad=True` argument indicates that gradients will
         :return: the value of E, which is the output of the energy_net model when given the input z.
         """
-        z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True)
-        E = self.energy_net(z_tensor).detach().numpy()[0]
+        #z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
+        #E = self.energy_net(z_tensor).detach().cpu().numpy()[0]
+        E = self.energy_net(z)
         return E
 
-    def m_new(self): #return new r and p
+    def m_new(self, solver_iterations=300, tol=5e-6): #return new r and p
         """
         The function `m_new` returns the values of `u`, `x[0]`, `x[1]`, and `x[2]` after solving the
         equation `f` using the `fsolve` function.
@@ -1740,6 +2495,38 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :return: a tuple containing the values of self.u, self.x[0], self.x[1], and self.x[2].
         """
         #calculate
-        (self.u, self.x[0], self.x[1], self.x[2])= fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1)
+        um_new = um_old.clone()
 
-        return (self.u, self.x[0], self.x[1], self.x[2])
+        for _ in range(solver_iterations):
+            um_prev = um_new.clone()
+
+            um_mid = 0.5*(um_old + um_new).requires_grad_(True)
+
+            En = self.energy_net(um_mid)
+            E_z = torch.autograd.grad(En.sum(), um_mid, only_inputs=True, retain_graph=True)[0]
+            L = self.L_net(um_mid)
+            umdot = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
+            
+            um_new = um_old + self.dt*umdot
+
+            rel_error = torch.norm(um_new - um_prev, dim=1) / (torch.norm(um_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                um_new_np = um_new.detach().cpu().numpy()
+                um_old_np = um_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    um_sol = fsolve(lambda x: self.f(x, mOld=um_old_np[idx]), um_new_np[idx])
+                    um_new[idx] = torch.tensor(um_sol, dtype=um_old.dtype, device=um_old.device)
+
+        self.u = um_new[:, 0]
+        self.x = um_new[:, 1:4]
+
+        return um_new
