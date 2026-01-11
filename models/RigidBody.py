@@ -9,63 +9,29 @@ import torch
 from models.Model import EnergyNet, TensorNet, JacVectorNet
 from learn import DEFAULT_folder_name
 
-def load_models(name = DEFAULT_folder_name, method = "without", mx = torch.zeros((1,1)), device="cpu"):
-    A, J_net = None, None
-    if method == "soft":
-        energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
-        energy_net.eval()   
-        L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
-        L_net.eval()
-    elif method == "without":
-        energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
-        energy_net.eval()
-
-        obj = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)
-        if isinstance(obj, torch.nn.Module): # old format
-            L_net = obj
-            L_net.eval()
-
-        elif isinstance(obj, dict):
-            L_type = obj.get('L_type', 'module')
-            if L_type == 'constant':
-                A = obj['A'].to(device)
-                def L_net(z):
-                    L = A - A.t()
-                    return L.unsqueeze(0).repeat(z.size(0), 1, 1)
-            elif L_type == 'module':
-                L_net = obj['L_tensor']
-                if isinstance(L_net, torch.nn.Module):
-                    L_net.to(device)
-                    L_net.eval()
-            else:
-                raise ValueError(f"Unknown L_type: {L_type}")
-    elif method == "implicit":
-        energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
-        energy_net.eval()
-        J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
-        J_net.eval()
-        J_net = J_net.to(device)
-        def L_net(z):
-            zeros = torch.zeros_like(mx)
-            L = torch.stack([
-                torch.stack([zeros, z[:, 2], -z[:, 1]], dim=1),
-                torch.stack([-z[:, 2], zeros, z[:, 0]], dim=1),
-                torch.stack([z[:, 1], -z[:, 0], zeros], dim=1)
-            ], dim=1)
-            return -L
-    else:
-        raise Exception("Unkonown method: ", method)
-    
-    return energy_net.to(device), L_net, J_net, A
-
-
-class RigidBody(object):
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, T=100, verbose = False, device = "cpu", dtype=torch.float32):
+class RigidBody(object): #Parent Rigid body class
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, T=100, verbose = False, device = "cpu"):
+        """
+        The above function is the initialization function for a class that represents a physical system,
+        setting up various parameters and variables.
+        
+        :param Ix: Ix is the moment of inertia about the x-axis. It represents the resistance of an object to changes in its rotational motion about the x-axis
+        :param Iy: Iy is the moment of inertia about the y-axis. It represents the resistance of an object to changes in its rotational motion about the y-axis
+        :param Iz: Iz is the moment of inertia around the z-axis. It represents the resistance of an object to changes in its rotational motion around the z-axis
+        :param d2E: The parameter `d2E` is the Hessian of energy.
+        :param mx: The parameter `mx` represents the x-component of the angular momentum
+        :param my: The parameter `my` represents the moment of inertia about the y-axis. It is used in the calculations for the rotational dynamics of the system
+        :param mz: The parameter `mz` represents the angular momentum in the z-direction
+        :param dt: The parameter "dt" represents the time step size for the simulation. It determines how much time elapses between each iteration of the simulation
+        :param alpha: The parameter "alpha" represents damping. 
+        :param T: T is the temperature in Kelvin, defaults to 100 (optional)
+        :param verbose: The `verbose` parameter is a boolean flag that determines whether or not to print out additional information during the initialization of the object. If `verbose` is set to `True`, then additional information will be printed. If `verbose` is set to `False`, then no additional information will be printed, defaults to False (optional)
+        """
         self.Ix = Ix
         self.Iy = Iy
         self.Iz = Iz
+
         self.d2E= d2E
-        self.dtype = dtype 
 
         if Iz > 0 and Iy > 0 and Iz > 0:
             self.Jx = 1/Iz - 1/Iy
@@ -73,13 +39,13 @@ class RigidBody(object):
             self.Jz = 1/Iy - 1/Ix
 
         self.device = device
-        self.mx = torch.as_tensor(mx, device=self.device, dtype=self.dtype)
-        self.my = torch.as_tensor(my, device=self.device, dtype=self.dtype)
-        self.mz = torch.as_tensor(mz, device=self.device, dtype=self.dtype)
+        self.mx = torch.as_tensor(mx, device=self.device)
+        self.my = torch.as_tensor(my, device=self.device)
+        self.mz = torch.as_tensor(mz, device=self.device)
 
-        self.mx0 = torch.as_tensor(mx, device=self.device, dtype=self.dtype)
-        self.my0 = torch.as_tensor(my, device=self.device, dtype=self.dtype)
-        self.mz0 = torch.as_tensor(mz, device=self.device, dtype=self.dtype)
+        self.mx0 = torch.as_tensor(mx, device=self.device)
+        self.my0 = torch.as_tensor(my, device=self.device)
+        self.mz0 = torch.as_tensor(mz, device=self.device)
 
         self.dt = dt
         self.tau = dt*alpha
@@ -426,14 +392,20 @@ class RBESeReCN(RigidBody):#E-SeRe with Crank Nicolson
         return m_new
 
 class RBIMR(RigidBody):#implicit midpoint
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, device="cpu", dtype=torch.float32):
-
-        super(RBIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, 0.0, device=device, dtype=dtype)
+    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, device="cpu"):
+        """
+        The function initializes an instance of the RBIMR class with given parameters.
         
-        if torch.is_tensor(self.d2E):
-             self.d2E = self.d2E.to(dtype=self.dtype)
-        else:
-             self.d2E = torch.as_tensor(self.d2E, device=device, dtype=self.dtype)
+        :param Ix: The moment of inertia about the x-axis
+        :param Iy: The parameter "Iy" represents the moment of inertia about the y-axis. It is a measure of an object's resistance to changes in rotation about the y-axis
+        :param Iz: The parameter "Iz" represents the moment of inertia about the z-axis. It is a measure of an object's resistance to changes in its rotational motion about the z-axis
+        :param d2E: The parameter "d2E" likely represents the second derivative of the energy function. It could be a function or a value that represents the rate of change of energy with respect to time
+        :param mx: The parameter "mx" represents the x-component of the moment of inertia
+        :param my: The parameter "my" represents the moment of inertia about the y-axis
+        :param mz: The parameter "mz" represents the moment of inertia about the z-axis
+        :param dt: The parameter "dt" represents the time step or time interval between each iteration or calculation in the RBIMR class.
+        """
+        super(RBIMR, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, 0.0, device=device)
 
     def f(self, mNew, mOld = None):#defines the function f zero of which is sought
         """
@@ -496,7 +468,7 @@ class RBIMR(RigidBody):#implicit midpoint
 
                 for idx in torch.where(not_converged)[0]:
                     m_sol = fsolve(lambda x: self.f(x, mOld=m_old_np[idx]), m_new_np[idx])
-                    m_new[idx] = torch.tensor(m_sol, dtype=self.dtype, device=self.device)
+                    m_new[idx] = torch.tensor(m_sol, dtype=m_old.dtype, device=m_old.device)
 
         #update
         self.mx = m_new[:, 0]
@@ -633,16 +605,39 @@ class Neural(RigidBody):#SeRe forward Euler
         :param name: The `name` parameter is a string that represents the folder name where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. The `name` parameter is used to construct the file paths for loading the models
         """
         super(Neural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, device=device)
+        # Load network
+        self.method = method
+        if method == "soft":
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "without":
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "implicit":
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
+            self.J_net.eval()
+            def L_net(z):
+                zeros = torch.zeros_like(self.mx)
+                L = torch.stack([
+                    torch.stack([zeros, z[:, 2], -z[:, 1]], dim=1),
+                    torch.stack([-z[:, 2], zeros, z[:, 0]], dim=1),
+                    torch.stack([z[:, 1], -z[:, 0], zeros], dim=1)
+                ], dim=1)
+                return -L
+            self.L_net = L_net
+        else:
+            raise Exception("Unkonown method: ", method)
 
         self.device = device
-
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, mx = self.mx, device = device)
-
-        self.method = method
-        
         self.energy_net.to(self.device)
         if hasattr(self, 'L_net') and isinstance(self.L_net, torch.nn.Module): self.L_net.to(self.device)
-        if hasattr(self, 'J_net') and self.J_net is not None: self.J_net.to(self.device)
+        if hasattr(self, 'J_net'): self.J_net.to(self.device)
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -1124,10 +1119,30 @@ class HeavyTopNeural(HeavyTopCN):
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and angular momentum calculations
         """
         super(HeavyTopNeural, self).__init__(Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, Mgl, init_rx, init_ry, init_rz, device=device)
-        
-        self.device = device
-        # implicit not implemented - exception would jaev neem raised earlier
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, device = device)
+        # Load network
+        self.method = method
+        if method == "soft":
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "without":
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "implicit":
+            raise Exception("Implicit solver not yet implemented for HT.")
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
+            self.J_net.eval()
+            def L_net(z):
+                L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
+                return L
+            self.L_net = L_net
+        else:
+            raise Exception("Unkonown method: ", method)
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -1323,7 +1338,7 @@ class HeavyTopNeuralIMR(HeavyTopNeural):
         return mr[:, :3], mr[:, 3:]
 
 class Particle3DCN(object): #Crank-Nicolson
-    def __init__(self, M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device="cpu", dtype=torch.float32):
+    def __init__(self, M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device="cpu"):
         """
         The function initializes the variables M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my,
         and init_mz.
@@ -1338,12 +1353,11 @@ class Particle3DCN(object): #Crank-Nicolson
         :param init_my: The parameter `init_my` represents the initial momentum in the y-direction
         :param init_mz: The parameter `init_mz` represents the initial value of the momentum component in the z-direction
         """
-        
-        self.dtype = dtype
         self.M = M #Hamiltonian = 1/2 p^2/M + 1/2 alpha r^2
         # self.r = np.array((init_rx, init_ry, init_rz))
-        self.r = torch.stack([init_rx, init_ry, init_rz], dim=1).to(dtype=self.dtype)
-        self.p = torch.stack([init_mx, init_my, init_mz], dim=1).to(dtype=self.dtype)
+        self.r = torch.stack([init_rx, init_ry, init_rz], dim=1)
+        #self.p = np.array((init_mx, init_my, init_mz))
+        self.p = torch.stack([init_mx, init_my, init_mz], dim=1)
         self.alpha = alpha
         self.dt = dt
 
@@ -1522,10 +1536,31 @@ class Particle3DNeural(Particle3DCN):
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and L (angular momentum) calculations
         """
         super(Particle3DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_rz, init_mx, init_my, init_mz, device=device)
-        
-        self.device = device
-        # implicit not implemented - exception would jaev neem raised earlier
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, device = device)
+        # Load network
+        self.method = method
+        if method == "soft":
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "without":
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "implicit":
+            raise Exception("Implicit solver not yet implemented for P3D.")
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
+            self.J_net.eval()
+            def L_net(z):
+                L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
+                return L
+            self.L_net = L_net
+        else:
+            raise Exception("Unkonown method: ", method)
+        self.device = next(self.energy_net.parameters()).device
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -1915,10 +1950,30 @@ class Particle2DNeural(Particle2DIMR):
         :param name: The `name` parameter is a string that represents the name of the folder where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. 
         """
         super(Particle2DNeural, self).__init__(M, dt, alpha, init_rx, init_ry, init_mx, init_my, zeta, device=device)
-        
-        self.device = device
-        # implicit not implemented - exception would jaev neem raised earlier
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, device = device)
+        # Load network
+        self.method = method
+        if method == "soft":
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "without":
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "implicit":
+            raise Exception("Implicit solver not yet implemented for P3D.")
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
+            self.J_net.eval()
+            def L_net(z):
+                L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
+                return L
+            self.L_net = L_net
+        else:
+            raise Exception("Unkonown method: ", method)
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -2092,6 +2147,11 @@ class ShivamoggiIMR(object):
         :return: a 4x4 numpy array called L.
         """
         U, V = self.get_UV(m)
+        """L = np.array([
+            [0.0, -U[0], -U[1], -U[2]],
+            [U[0], 0.0, -V[2], V[1]],
+            [U[1], V[2], 0.0, -V[0]],
+            [U[2], -V[1], V[0], 0.0]])/(m[0]+m[3])"""
         zeros = torch.zeros_like(U[:,0], dtype=U.dtype, device=U.device)
         L = torch.stack([
             torch.stack([zeros, -U[:,0], -U[:,1], -U[:,2]], dim=1),
@@ -2121,6 +2181,95 @@ class ShivamoggiIMR(object):
         mres = mOld-mNew + self.dt*mdot
         return (mres[0], mres[1], mres[2], mres[3]) 
 
+    """def m_new(self, solver_iterations=300, tol=1e-8): #return new r and p
+        ""
+        The function `m_new` returns new values for `u`, `x[0]`, `x[1]`, and `x[2]` by solving the equation
+        `f(u, x[0], x[1], x[2]) = 0` using the `fsolve` function.
+        :return: a tuple containing the values of u, x, y, and z.
+        ""
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1).to(torch.float64)
+        um_new = um_old.clone()
+
+        for _ in range(solver_iterations):
+            um_prev = um_new.clone()
+
+            um_mid = 0.5*(um_old + um_new)
+
+            umdot = torch.stack([-um_mid[:, 0]*um_mid[:, 2], um_mid[:, 3]*um_mid[:, 2],
+                                 um_mid[:, 3]*um_mid[:, 1]-um_mid[:, 0]**2, um_mid[:, 1]*um_mid[:, 2]], dim=1)
+
+            um_new = um_old + self.dt*umdot
+
+            rel_error = torch.norm(um_new - um_prev, dim=1) / (torch.norm(um_prev, dim=1) + 1e-12)
+            if torch.all(rel_error < tol):
+                break
+        else:
+            not_converged = (rel_error >= tol)
+
+            if not_converged.any():
+                print(f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve...")
+
+                um_new_np = um_new.detach().cpu().numpy()
+                um_old_np = um_old.detach().cpu().numpy()
+
+                for idx in torch.where(not_converged)[0]:
+                    um_sol = fsolve(lambda x: self.f(x, mOld=um_old_np[idx]), um_new_np[idx])
+                    um_new[idx] = torch.tensor(um_sol, dtype=um_old.dtype, device=um_old.device)
+
+        ""(u, x, y, z) = fsolve(self.f, (self.u, self.x[0], self.x[1], self.x[2]))
+        self.u = u
+        self.x[0] = x
+        self.x[1] = y
+        self.x[2] = z
+        return (u, x, y, z)""
+
+        self.u = um_new[:, 0]
+        self.x = um_new[:, 1:4]
+
+        return um_new
+    
+    def f_torch(self, mNew, mOld):
+        m_mid = 0.5 * (mNew + mOld)
+        mdot = torch.stack([
+            -m_mid[:, 0] * m_mid[:, 2],
+            m_mid[:, 3] * m_mid[:, 2],
+            m_mid[:, 3] * m_mid[:, 1] - m_mid[:, 0]**2,
+            m_mid[:, 1] * m_mid[:, 2]
+        ], dim=1)
+        return mOld - mNew + self.dt * mdot
+
+    def m_new(self, solver_iterations=50, tol=1e-10):
+        um_old = torch.cat([self.u.unsqueeze(-1), self.x], dim=1)
+        um_new = um_old.clone()
+
+        for _ in range(solver_iterations):
+            um_new = um_new.clone().detach().requires_grad_(True)
+
+            batch_size = um_new.shape[0]
+            delta = torch.zeros_like(um_new)
+
+            for i in range(batch_size):
+                xi = um_new[i:i+1].detach().requires_grad_(True)
+                fi = self.f_torch(xi, um_old[i:i+1])
+                
+                Ji = torch.autograd.functional.jacobian(
+                    lambda x: self.f_torch(x, um_old[i:i+1]), xi).squeeze(0).squeeze(1)
+                
+                delta[i] = torch.linalg.solve(Ji, fi.squeeze(0).unsqueeze(-1)).squeeze(-1)
+
+            um_next = um_new - delta
+
+            rel_error = torch.norm(um_next - um_new, dim=1) / (torch.norm(um_new, dim=1) + 1e-12)
+            um_new = um_next.detach()
+
+            if torch.all(rel_error < tol):
+                break
+
+        self.u = um_new[:, 0]
+        self.x = um_new[:, 1:4]
+
+        return um_new"""
+    
     def _mdot(self, m):
         return torch.stack([
             -m[:, 0] * m[:, 2],
@@ -2200,19 +2349,8 @@ class ShivamoggiIMR(object):
             update_indices = active_indices[update_mask]
             mNew[update_indices] = mNew_candidate
 
-        not_converged = ~converged_mask
-        if not_converged.any():
-            print(f"Warning: {not_converged.sum().item()} systems did not converge. Using fsolve as fallback...")
-
-            mOld_np = mOld[not_converged].detach().cpu().numpy()
-            mNew_np = mNew[not_converged].detach().cpu().numpy()
-            indices = torch.where(not_converged)[0]
-
-            for i, idx in enumerate(indices):
-                def fun(x):
-                    return np.array(self.f(x, mOld=mOld_np[i]))
-                sol = fsolve(fun, mNew_np[i])
-                mNew[idx] = torch.tensor(sol, dtype=mNew.dtype, device=mNew.device)
+        if not torch.all(converged_mask):
+            print(f"Warning: Did not converge for all systems. ({torch.sum(converged_mask)}/{mOld.shape[0]} converged).")
         return mNew
     
     def m_new(self, solver_iterations=300, tol=1e-6):
@@ -2243,10 +2381,30 @@ class ShivamoggiNeural(ShivamoggiIMR):
         :param name: The `name` parameter is a string that represents the folder name where the saved models are located. It is used to load the pre-trained neural network models for energy and L (Lagrangian) calculations. The `name` parameter is used to construct the file paths for loading the models
         """
         super(ShivamoggiNeural, self).__init__(M, dt, alpha, init_rx,  init_ry, init_rz, init_u, device=device)
-        
-        self.device = device
-        # implicit not implemented - exception would have been raised earlier
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, device = device)
+        # Load network
+        self.method = method
+        if method == "soft":
+            self.energy_net = torch.load(name+'/saved_models/soft_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/soft_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "without":
+            self.energy_net = torch.load(name+'/saved_models/without_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()   
+            self.L_net = torch.load(name+'/saved_models/without_jacobi_L', weights_only=False)  # changed weights_only=False
+            self.L_net.eval()
+        elif method == "implicit":
+            raise Exception("Implicit solver not yet implemented for Shivamoggi.")
+            self.energy_net = torch.load(name+'/saved_models/implicit_jacobi_energy', weights_only=False)  # changed weights_only=False
+            self.energy_net.eval()
+            self.J_net = torch.load(name+'/saved_models/implicit_jacobi_J', weights_only=False)  # changed weights_only=False
+            self.J_net.eval()
+            def L_net(z):
+                L = -1*torch.tensor([[[0.0, z[2], -z[1]],[-z[2], 0.0, z[0]],[z[1], -z[0], 0.0]]])
+                return L
+            self.L_net = L_net
+        else:
+            raise Exception("Unkonown method: ", method)
 
     # Get gradient of energy from NN
     def neural_zdot(self, z):
@@ -2372,179 +2530,3 @@ class ShivamoggiNeural(ShivamoggiIMR):
         self.x = um_new[:, 1:4]
 
         return um_new
-
-
-class ParticleNDCN(object):  # Crank–Nicolson, arbitrary dimension
-    def __init__(self, D, M, dt, alpha, init_r=None, init_p=None, B=1, device="cpu"):
-        """
-        N-dimensional harmonic oscillator
-        Hamiltonian: H = 1/2 p^2 / M + 1/2 alpha r^2
-        """
-        self.D = D
-        self.M = M
-        self.dt = dt
-        self.alpha = alpha
-        self.device = device
-
-        if init_r is None:
-            init_r = torch.randn(B, D, device=device)
-        if init_p is None:
-            init_p = torch.randn(B, D, device=device)
-
-        self.r = init_r.to(device)
-        self.p = init_p.to(device)
-
-    def get_E(self, m):
-        r = m[:, :self.D]
-        p = m[:, self.D:]
-        return 0.5 * (p.pow(2).sum(dim=1)) / self.M + 0.5 * self.alpha * (r.pow(2).sum(dim=1))
-
-    def get_L(self, m):
-        B = m.shape[0]
-        D = self.D
-        device = m.device
-        dtype = m.dtype
-
-        L = torch.zeros((B, 2 * D, 2 * D), dtype=dtype, device=device)
-        I = torch.eye(D, dtype=dtype, device=device).expand(B, -1, -1)
-        L[:, :D, D:] = I / self.M
-        L[:, D:, :D] = -self.alpha * I
-        return L
-
-    def f(self, rpNew, rpOld=None):
-        if rpOld is None:
-            rpOld = np.concatenate([self.r[0].cpu().numpy(), self.p[0].cpu().numpy()])
-
-        r_old, p_old = rpOld[: self.D], rpOld[self.D :]
-        r_new, p_new = rpNew[: self.D], rpNew[self.D :]
-
-        rmdot_old = np.concatenate([p_old / self.M, -self.alpha * r_old])
-        rmdot_new = np.concatenate([p_new / self.M, -self.alpha * r_new])
-
-        rpres = rpOld - rpNew + self.dt / 2 * (rmdot_old + rmdot_new)
-
-        return rpres
-
-    def m_new(self, solver_iterations=200, tol=1e-6):
-        rp_old = torch.cat([self.r, self.p], dim=1)  # (B, 2D)
-        rp_new = rp_old.clone()
-
-        rmdot_old = torch.cat([self.p / self.M, -self.alpha * self.r], dim=1)
-
-        for _ in range(solver_iterations):
-            rp_prev = rp_new.clone()
-
-            rmdot_new = torch.cat([rp_new[:, self.D:] / self.M, -self.alpha * rp_new[:, : self.D]], dim=1)
-
-            rp_new = rp_old + self.dt / 2 * (rmdot_old + rmdot_new)
-
-            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
-            if torch.all(rel_error < tol):
-                break
-        else:
-            not_converged = (rel_error >= tol)
-
-            if not_converged.any():
-                print(
-                    f"Max iterations reached! {not_converged.sum().item()} examples did not converge. Falling back to fsolve..."
-                )
-
-                rp_new_np = rp_new.detach().cpu().numpy()
-                rp_old_np = rp_old.detach().cpu().numpy()
-
-                for idx in torch.where(not_converged)[0]:
-                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
-                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
-
-        self.r = rp_new[:, : self.D]
-        self.p = rp_new[:, self.D :]
-
-        return self.r, self.p
-
-
-class ParticleNDCNNeural(ParticleNDCN):
-    def __init__(self, D, M, dt, alpha, init_r=None, init_p=None, B=1,
-                 device="cpu", method="without", name="models"):
-        
-        super().__init__(D, M, dt, alpha, init_r=init_r, init_p=init_p, B=B, device=device)
-
-        self.device = device
-        # implicit not implemented - exception would jaev neem raised earlier
-        self.energy_net, self.L_net, self.J_net, self.A = load_models(name = name, method = method, device = device)
-
-    def neural_zdot(self, z):
-        if isinstance(z, np.ndarray):
-            z_tensor = torch.tensor(z, dtype=torch.float32, requires_grad=True, device=self.device)
-        else:
-            z_tensor = z.clone().detach().requires_grad_(True).to(self.device)
-
-        En = self.energy_net(z_tensor)
-        E_z = torch.autograd.grad(En.sum(), z_tensor, only_inputs=True)[0]
-
-        if self.method in ("soft", "without"):
-            L = self.L_net(z_tensor)  # expect shape (B, 2D, 2D)
-            zdot = torch.bmm(L, E_z.unsqueeze(-1)).squeeze(-1)
-        else:
-            raise Exception("Implicit method not yet supported for ParticleNDCN.")
-
-        if isinstance(z, np.ndarray):
-            return zdot.detach().cpu().numpy()
-        return zdot
-
-    def f(self, rpNew, rpOld=None):
-        if rpOld is None:
-            rpOld = torch.cat([self.r, self.p], dim=1).detach().cpu().numpy()
-
-        zdo = self.neural_zdot(rpOld)
-        zd = self.neural_zdot(rpNew)
-
-        return np.array(rpOld) - np.array(rpNew) + self.dt / 2 * (zdo + zd)
-
-    def get_E(self, z):
-        if isinstance(z, np.ndarray):
-            z = torch.tensor(z, dtype=torch.float32, device=self.device)
-        return self.energy_net(z)
-
-    def get_L(self, z):
-        if isinstance(z, np.ndarray):
-            z = torch.tensor(z, dtype=torch.float32, device=self.device)
-        return self.L_net(z)
-
-    def m_new(self, solver_iterations=200, tol=1e-6):
-        rp_old = torch.cat([self.r, self.p], dim=1).requires_grad_(True)
-        rp_new = rp_old.clone()
-
-        En_old = self.energy_net(rp_old)
-        E_z_old = torch.autograd.grad(En_old.sum(), rp_old, only_inputs=True, retain_graph=True)[0]
-        L = self.L_net(rp_old)
-        zd_old = torch.bmm(L, E_z_old.unsqueeze(-1)).squeeze(-1)
-
-        for _ in range(solver_iterations):
-            rp_prev = rp_new.clone()
-
-            En_new = self.energy_net(rp_new)
-            E_z_new = torch.autograd.grad(En_new.sum(), rp_new, only_inputs=True, retain_graph=True)[0]
-            L = self.L_net(rp_new)
-            zd_new = torch.bmm(L, E_z_new.unsqueeze(-1)).squeeze(-1)
-
-            rp_new = rp_old + self.dt / 2 * (zd_new + zd_old)
-
-            rel_error = torch.norm(rp_new - rp_prev, dim=1) / (torch.norm(rp_prev, dim=1) + 1e-12)
-            if torch.all(rel_error < tol):
-                break
-        else:
-            not_converged = (rel_error >= tol)
-            if not_converged.any():
-                print(f"Max iterations reached! {not_converged.sum().item()} did not converge. Falling back to fsolve...")
-
-                rp_new_np = rp_new.detach().cpu().numpy()
-                rp_old_np = rp_old.detach().cpu().numpy()
-
-                for idx in torch.where(not_converged)[0]:
-                    rp_sol = fsolve(lambda x: self.f(x, rpOld=rp_old_np[idx]), rp_new_np[idx])
-                    rp_new[idx] = torch.tensor(rp_sol, dtype=rp_old.dtype, device=rp_old.device)
-
-        self.r = rp_new[:, :self.D]
-        self.p = rp_new[:, self.D:]
-
-        return self.r, self.p
