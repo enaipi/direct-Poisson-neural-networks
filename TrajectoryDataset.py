@@ -5,7 +5,7 @@ import torch
 class TrajectoryDataset(Dataset):
     """TRAJECTORY DATASET"""
 
-    def __init__(self, dataframe, model = "RB", device=None, no_data_to_gpu=True):
+    def __init__(self, dataframe, model = "RB", device=None, no_data_to_gpu=True, dim=10):
         if model == "RB":
             features = np.vstack((dataframe["old_mx"], dataframe["old_my"], dataframe["old_mz"])).transpose()
             targets  = np.vstack((dataframe["mx"], dataframe["my"], dataframe["mz"])).transpose()
@@ -21,6 +21,14 @@ class TrajectoryDataset(Dataset):
         elif model == "Sh":
             features = np.vstack((dataframe["old_u"], dataframe["old_x"], dataframe["old_y"], dataframe["old_z"])).transpose()
             targets  = np.vstack((dataframe["u"], dataframe["x"], dataframe["y"], dataframe["z"])).transpose()
+        elif model == "D":
+            old_r_cols = [f"old_r{i}" for i in range(dim)]
+            old_p_cols = [f"old_p{i}" for i in range(dim)]
+            r_cols     = [f"r{i}" for i in range(dim)]
+            p_cols     = [f"p{i}" for i in range(dim)]
+
+            features = dataframe[old_r_cols + old_p_cols].to_numpy()
+            targets  = dataframe[r_cols + p_cols].to_numpy()
         else:
             raise Exception("Unknown model.")
 
