@@ -19,15 +19,15 @@ def save_simulation(data_frame, file_name): #save data to file_name
 
 
 def simulate_batch(args, initial_states_batch, method = "normal"):
-    #Create d2E matrix
+
     d2E = torch.tensor([[1/args.Ix,0,0],\
                     [0,1/args.Iy,0],\
                     [0,0, 1/args.Iz]], device=args.device)
                     
     ts, ms, msqs, Ls, Es, casss, rs, mrs, rsqs = [], [], [], [], [], [], [], [], []
 
-    # device = torch.device("cuda" if torch.cuda.is_available() and args.cuda and args.simulate_cuda else "cpu")
     device = args.device
+    
     batch_size = initial_states_batch.shape[0]
 
     init_mx = initial_states_batch[:, 0]
@@ -184,6 +184,13 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
                 #solver = Particle3DCN(args.M, args.dt, args.alpha, init_rx, init_ry, init_rz, init_mx,init_my,init_mz)
         else:
             raise Exception("Unknown method.")
+    elif args.model == "D":
+        init_r = 2 * torch.randn(batch_size, args.dimensions, device=device) - 1
+        init_p = 2 * torch.randn(batch_size, args.dimensions, device=device) - 1
+        if method == "normal":
+            solver = ParticleNDCN(args.dimensions, args.M, args.dt, args.alpha, init_p=init_p, init_r=init_r, B=args.batch_size, device=device)
+        else:
+            solver = ParticleNDCNNeural(args.dimensions, args.M, args.dt, args.alpha, init_p=init_p, init_r=init_r, B=batch_size, device=device, method=method, name=args.folder_name)
 
     #Timesteps
     dt = args.dt
@@ -217,6 +224,20 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
         m = torch.stack([init_mx,init_rx,init_ry,init_rz], dim=1)
         Ls.append(solver.get_L(m))
         Es.append(solver.get_E(m))
+    elif args.model == "D":
+        r = solver.r
+        p = solver.p
+        if r.shape[0] == batch_size:
+            r_batch = r
+            p_batch = p
+        else:
+            r_batch = r.repeat(batch_size, 1)
+            p_batch = p.repeat(batch_size, 1)
+        mr = torch.cat([r_batch, p_batch], dim=1)  # (batch_size, 2D)
+        m = p_batch
+        r = r_batch
+        Ls.append(solver.get_L(mr))
+        Es.append(solver.get_E(mr))
     else:
         raise Exception("Unknown model.")
 
@@ -246,6 +267,8 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
             (m, r) = solver.m_new()
         elif args.model == "P3D" or args.model == "K3D" or args.model=="P2D":
             (r, m) = solver.m_new()
+        elif args.model == "D":
+            (r, m) = solver.m_new()
 
         if i % store_each == 0:
             t = torch.full((batch_size, 1), dt * i, device=m.device, dtype=torch.float32)
@@ -269,6 +292,12 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
                 rs.append(r)
                 rsqs.append((r * r).sum(dim=1))
             elif args.model == "P2D":
+                Ls.append(solver.get_L(mr))
+                Es.append(solver.get_E(mr))
+                rs.append(r)
+                rsqs.append((r * r).sum(dim=1, keepdim=True))
+            elif args.model == "D":
+                mr = torch.cat([r, m], dim=1)
                 Ls.append(solver.get_L(mr))
                 Es.append(solver.get_E(mr))
                 rs.append(r)
@@ -357,6 +386,13 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
             step_index = np.tile(np.arange(T), B)
             data_flat = data.transpose(1, 0, 2).reshape(B * T, F)
             return pd.DataFrame(data_flat, columns = ["time", "old_u", "old_x", "old_y", "old_z", "u", "x",  "y", "z"] + L_columns + ["E"], index=step_index)
+        elif args.model == "D":
+            data = np.concatenate((ts, ms_old, rs_old, ms, rs, msqs, Ls_upper_np, Es), axis=-1, dtype=np.float32)
+            T, B, F = data.shape
+            step_index = np.tile(np.arange(T), B)
+            data_flat = data.transpose(1, 0, 2).reshape(B * T, F)
+            coord_columns = [f"r{i}" for i in range(args.dimensions)] + [f"p{i}" for i in range(args.dimensions)]
+            return pd.DataFrame(data_flat, columns = ["time"] + [f"old_{col}" for col in coord_columns] + coord_columns + ["sqm"] + L_columns + ["E"], index=step_index)
 
 
 #def get_file_name(args):
@@ -408,7 +444,8 @@ if __name__ == "__main__":
     parser.add_argument("--cuda", default=False, action="store_true", help="Use GPU if available")
     parser.add_argument("--zeta", default=0.0, type=float, help="Dissipation coefficient (NOT IMPLEMENTED)")
     parser.add_argument("--folder_name", default=DEFAULT_folder_name, type=str, help="Folder name")
-    
+    parser.add_argument("--dimensions", default=10, type=int, help="The spatial dimension of the particle system 'D'.")
+    parser.add_argument("--simulation_batch_size", default=128, type=int)
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
@@ -446,6 +483,8 @@ if __name__ == "__main__":
         num_state_vars = 6
     elif args.model == "P2D":
         num_state_vars = 4
+    elif args.model == "D":
+        num_state_vars = 2*args.dimensions
     else:
         raise Exception("Unknown model specified.")
     initial_states = torch.tensor([[args.init_mx, args.init_my, args.init_mz, args.init_rx, args.init_ry, args.init_rz]],
@@ -453,6 +492,7 @@ if __name__ == "__main__":
     
     print(f"Starting single trajectory simulation for model '{args.model}' with method '{method_str}'.")
 
+    args.batch_size=1
     simulation_data = simulate_batch(args, initial_states, method=method_str)
 
     save_simulation(simulation_data, file_name)

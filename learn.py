@@ -33,7 +33,9 @@ class Learner(object):
     This is the fundamental class that provides the capability to learn dynamical systems, 
     using various methods of learning (without Jacobi identity, with softly enforced Jacobi, and with implicitly valid Jacobi).
     """
-    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons, layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0, quad_features=False, no_data_to_gpu=True):   # added dropout parameter
+    def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons,
+                 layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0,
+                 quad_features=False, no_data_to_gpu=True, D=10, use_constant_L=False):
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -55,6 +57,8 @@ class Learner(object):
             dim = 6
         elif model == "P2D" or model == "Sh":
             dim = 4
+        elif model == "D":
+            dim = 2*D
         else:
             raise Exception("Unknown model "+model)
         print("Generating Learner for model ", model, " with ", dim, " dimensions.")
@@ -70,28 +74,36 @@ class Learner(object):
         #    ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
         #))
 
+        #start_time = time.time()
         self.df = pd.read_csv(name+"/"+DEFAULT_dataset, dtype=np.float32)
+        #end_time = time.time()
+        #print(end_time-start_time)
 
         self.energy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
-        self.L_tensor = TensorNet(dim, neurons, layers, max(batch_size, simulation_batch_size), dropout_rate=dropout_rate)  # added dropout parameter
+
         self.jac_vec = JacVectorNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate)  # added dropout parameter
         self.entropy = EnergyNet(dim, neurons, layers, batch_size, dropout_rate=dropout_rate, quad_features=quad_features)  # added dropout and quad features parameters
 
         self.device = device
         self.energy = self.energy.to(self.device)
-        self.L_tensor = self.L_tensor.to(self.device)
+        
         self.jac_vec = self.jac_vec.to(self.device)
         self.entropy = self.entropy.to(self.device)
         # self.dispot = self.dispot.to(self.device)
 
+        self.use_constant_L = use_constant_L
+        if self.use_constant_L:
+            self.A = torch.nn.Parameter(torch.randn(dim, dim, device=self.device))
+        else:
+            self.L_tensor = TensorNet(dim, neurons, layers, max(batch_size, simulation_batch_size), dropout_rate=dropout_rate).to(self.device)
+        
         self.train, self.test = train_test_split(self.df, test_size=0.4)
-        self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
-        self.valid_dataset = TrajectoryDataset(self.test, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu)
+        self.train_dataset = TrajectoryDataset(self.train, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu, dim=D)
+        self.valid_dataset = TrajectoryDataset(self.test, model = model, device=self.device, no_data_to_gpu=no_data_to_gpu, dim=D)
 
         self.train_loader = DataLoader(self.train_dataset, batch_size=batch_size, shuffle=True)
         self.valid_loader = DataLoader(self.valid_dataset, batch_size=batch_size, shuffle=True)
 
-        #loss weighting
         self.dt = dt
         #self.lam = 0.5
 
@@ -110,6 +122,18 @@ class Learner(object):
         self.train_errors = []
         self.validation_errors = []
 
+        self.noise_sigma = -1 # add random noise to data
+
+    def L_tensor_func(self, zn_tensor):
+        L = self.A - self.A.t()
+        return L.unsqueeze(0).repeat(zn_tensor.size(0), 1, 1)
+
+    def forward_L_tensor(self, zn_tensor):
+        if self.use_constant_L:
+            return self.L_tensor_func(zn_tensor)
+        else:
+            return self.L_tensor(zn_tensor)
+
     def mov_loss_without(self, zn_tensor, zn2_tensor, mid_tensor):
         """
         The function calculates the movement loss using the "without" method.
@@ -125,12 +149,15 @@ class Learner(object):
         E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
         E_z2 = torch.autograd.grad(En2.sum(), zn2_tensor, only_inputs=True, create_graph=True)[0]
 
-        Lz = self.L_tensor(zn_tensor)
-        Lz2 = self.L_tensor(zn2_tensor)
-        return (zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.matmul(Lz, E_z.unsqueeze(2)).squeeze() \
-                                                        + torch.matmul(Lz2, E_z2.unsqueeze(2)).squeeze())
+        Lz = self.forward_L_tensor(zn_tensor)
+        Lz2 = self.forward_L_tensor(zn2_tensor)
 
-    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+        term1 = torch.bmm(Lz, E_z.unsqueeze(2)).squeeze(2)
+        term2 = torch.bmm(Lz2, E_z2.unsqueeze(2)).squeeze(2)
+
+        return (zn_tensor - zn2_tensor)/self.dt + 0.5*(term1 + term2)
+
+    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L=None):
         """
         The function calculates the movement loss including Jacobi identity the for a given input tensor.
         
@@ -146,10 +173,11 @@ class Learner(object):
         E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
         E_z2 = torch.autograd.grad(En2.sum(), zn2_tensor, only_inputs=True, create_graph=True)[0]
 
-        Lz = self.L_tensor(zn_tensor)
-        Lz2 = self.L_tensor(zn2_tensor)
+        Lz = self.forward_L_tensor(zn_tensor)
+        Lz2 = self.forward_L_tensor(zn2_tensor)
 
-        jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L) 
+        with torch.no_grad():
+            jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L)
 
         return (zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.matmul(Lz, E_z.unsqueeze(2)).squeeze() \
                                                         + torch.matmul(Lz2, E_z2.unsqueeze(2)).squeeze()), jacobi_loss
@@ -163,11 +191,53 @@ class Learner(object):
         :param reduced_L: The parameter `reduced_L` is a tensor representing the reduced loss function
         :return: the sum of three terms: term1, term2, and term3.
         """
+        #Lz_grad = torch.autograd.functional.jacobian(reduced_L, zn_tensor, create_graph=True).permute(2, 0, 1, 3)
+        J = self.L_tensor.get_jacobian(zn_tensor)
+        
+        """B, dim, _ = Lz.shape
+        
+        tri_i0, tri_i1 = self.L_tensor.tri_i
+
+        # p = dim*(2*dim - 1)
+        Lz_flat = Lz[:, tri_i0, tri_i1]  # (B, p)
+
+        term1_flat = Lz_flat.unsqueeze(2) * J  # (B, p, dim)
+
+        term1 = torch.empty(B, dim, dim, dim, device=term1_flat.device)
+
+        term1[:, tri_i0, tri_i1, :] = term1_flat
+        # self.L_tensor.sym_sing = -1
+        term1[:, tri_i1, tri_i0, :] = self.L_tensor.sym_sing * term1_flat  # (B, dim, dim, dim)
+        # torch.mul(self.L_tensor.sym_sing, term1_flat, out=term1[:, tri_i1, tri_i0, :])
+
+        out = term1.clone()
+        out.add_(term1.permute(0,2,3,1))
+        out.add_(term1.permute(0,3,1,2))"""
+
+        term1 = einsum('mkl,mijk->mijl', Lz, J)
+    
+        term2 = term1.permute(0, 2, 3, 1)
+        term3 = term1.permute(0, 3, 1, 2)
+        
+        jacobi_identity_error = term1 + term2 + term3
+        del term1, term2, term3, J
+        return jacobi_identity_error.pow(2).mean()
+    
+    def jacobi_loss_og(self, zn_tensor, Lz, reduced_L):
+        """
+        The function `jacobi_loss` calculates the Jacobi loss (error in Jacobi identity) using the given inputs.
+        
+        :param zn_tensor: The `zn_tensor` parameter is a tensor representing the input to the function. It is used to compute the Jacobian loss.
+        :param Lz: Lz is a tensor representing the Jacobian matrix of the output with respect to the input. It has shape (m, n, n), where m is the number of samples and n is the number of input variables.
+        :param reduced_L: The parameter `reduced_L` is a tensor representing the reduced loss function
+        :return: the sum of three terms: term1, term2, and term3.
+        """
         Lz_grad = torch.autograd.functional.jacobian(reduced_L, zn_tensor, create_graph=True).permute(2, 0, 1, 3)
+        #print(torch.max(Lz_grad))
         term1 = einsum('mkl,mijk->mijl', Lz, Lz_grad)
         term2 = term1.permute(0,2,3,1)
         term3 = term1.permute(0,3,1,2)
-        return term1 + term2 + term3
+        return (term1 + term2 + term3).pow(2).mean()
 
     def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
         """
@@ -185,12 +255,12 @@ class Learner(object):
         E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
         E_z2 = torch.autograd.grad(En2.sum(), zn2_tensor, only_inputs=True, create_graph=True)[0]
 
-        Lz = self.L_tensor(zn_tensor)
-        Lz2 = self.L_tensor(zn2_tensor)
+        Lz = self.forward_L_tensor(zn_tensor)
+        Lz2 = self.forward_L_tensor(zn2_tensor)
         mov_loss = (zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.matmul(Lz, E_z.unsqueeze(2)).squeeze() \
                                                         + torch.matmul(Lz2, E_z2.unsqueeze(2)).squeeze())
         #Jacobi
-        jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L) 
+        jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L)
         return mov_loss, jacobi_loss
 
         
@@ -234,19 +304,22 @@ class Learner(object):
         optimizer, scheduler = None, None
 
         if method in ["without", "soft"]:
-            optimizer = torch.optim.Adam(list(self.energy.parameters())
-                                    + list(self.L_tensor.parameters()), lr = learning_rate)
+            if self.use_constant_L:
+                optimizer = torch.optim.Adam(list(self.energy.parameters()) + [self.A], lr=learning_rate)
+            else:
+                optimizer = torch.optim.Adam(list(self.energy.parameters()) + list(self.L_tensor.parameters()), lr = learning_rate)
         elif method == "implicit":
             optimizer = torch.optim.Adam(list(self.energy.parameters())
                              + list(self.jac_vec.parameters()), lr = learning_rate)
-        scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.98, last_epoch= -1)
-
+        #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.98, last_epoch= -1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
         mov_loss, jacobi_loss, Lz, Lz2, Jz, Jz2, cass, cass2, reduced_L = None, None, None, None, None, None, None, None, None
         for epoch in range(epochs):
             print("\nStart of epoch %d" % (epoch,))
-            start_time = time.time()
-            reduced_L = lambda z: torch.sum(self.L_tensor(z), axis=0)
+            start_time_train = time.time()
+            #start_time = time.time()
+            reduced_L = lambda z: torch.sum(self.forward_L_tensor(z), axis=0)
 
             # Iterate over the batches of the dataset.
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.train_loader):
@@ -258,6 +331,11 @@ class Learner(object):
                     zn_tensor = zn_tensor.to(self.device)
                     zn2_tensor = zn2_tensor.to(self.device)
                     mid_tensor = mid_tensor.to(self.device)
+
+                if self.noise_sigma > 0.0:
+                    zn_tensor = zn_tensor + self.noise_sigma * torch.randn_like(zn_tensor)
+                    zn2_tensor = zn2_tensor + self.noise_sigma * torch.randn_like(zn2_tensor)
+                    mid_tensor = mid_tensor + self.noise_sigma * torch.randn_like(mid_tensor)
                     
                 optimizer.zero_grad()
                 zn_tensor.requires_grad = True
@@ -272,15 +350,13 @@ class Learner(object):
                     mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
                 
                 mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
-                loss = mov_value 
+                loss = mov_value
                 self.train_metric(torch.zeros_like(mov_value), mov_value)
                 if method == "soft":
                     reg_value = self.loss_fn(torch.zeros_like(jacobi_loss), jac_prefactor*jacobi_loss)
                     loss += reg_value
                     self.train_metric_reg(torch.zeros_like(reg_value), reg_value)
 
-                # Use the backward method tape to automatically retrieve
-                # the gradients of the trainable variables with respect to the loss.
                 loss.backward()
                 optimizer.step()
 
@@ -288,7 +364,7 @@ class Learner(object):
                 # the value of the variables to minimize the loss.
 
                 # Log every 200 batches.
-                if step % 200 == 0:
+                """if step % 200 == 0:
                     if method == "soft":
                         print(
                         "Training loss (for one batch) at step %d: movement %.4f and reg %.4f"
@@ -298,7 +374,7 @@ class Learner(object):
                         print(
                             "Training loss (for one batch) at step %d: movement %.4f "
                             % (step, float(mov_value))
-                        )
+                        )"""
                     #print("Seen so far: %s samples" % ((step + 1) * 64))
 
 
@@ -313,7 +389,11 @@ class Learner(object):
             else:
                 print("Training err over epoch: %.4f " % (float(train_acc)))
                 self.train_errors.append([float(train_acc), 0.0])
+            
+            end_time_train = time.time()
+            print("Time taken for training: %.2fs" % (end_time_train - start_time_train))
 
+            start_time_val = time.time()
             # Run a validation loop at the end of each epoch.
             jacobi_loss = None
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
@@ -328,16 +408,21 @@ class Learner(object):
                 mid_tensor.requires_grad = True
 
                 if method == "without":
-                    mov_loss, jacobi_loss = self.mov_loss_without_with_jacobi(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
+                    if self.use_constant_L:
+                        mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
+                    else:
+                        mov_loss, jacobi_loss = self.mov_loss_without_with_jacobi(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
                 elif method == "implicit":
                     mov_loss = self.mov_loss_implicit(zn_tensor, zn2_tensor, mid_tensor) #Jacobi identity automatically satisfied
                 elif method == "soft":
                     mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
 
-                mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
+                #mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
+                mov_value = mov_loss.pow(2).mean() * prefactor**2
                 self.val_metric(torch.zeros_like(mov_value), mov_value)
                 if jacobi_loss != None:
                     reg_value = self.loss_fn(torch.zeros_like(jacobi_loss), jac_prefactor*jacobi_loss)
+                    #reg_value = jacobi_loss.pow(2).mean() * jac_prefactor**2
                     self.val_metric_reg(torch.zeros_like(reg_value), reg_value)
 
             val_acc_val = self.val_metric.compute()
@@ -351,8 +436,11 @@ class Learner(object):
                 self.validation_errors.append([float(val_acc_val), 0.0])
                 print("Validation error: value %.4f" % (float(val_acc_val)))
 
-            print("Time taken: %.2fs" % (time.time() - start_time))
+            end_time_val = time.time()
+            print("Time taken for validation: %.2fs" % (end_time_val - start_time_val))
+            #print("Time taken: %.2fs" % (time.time() - start_time))
             scheduler.step()
+            #print(optimizer.param_groups[0]['lr'])
 
         # The above code is saving various variables and dataframes to files based on the value of the
         # "method" parameter. If the "method" is "without", it saves the "energy", "L_tensor", "entropy", and
@@ -363,7 +451,10 @@ class Learner(object):
         errors_df = pd.DataFrame(errors, columns = ["train_mov", "train_reg", "val_mov", "val_reg"]) 
         if method == "without":
             torch.save(self.energy, self.name+'/saved_models/without_jacobi_energy')
-            torch.save(self.L_tensor, self.name+'/saved_models/without_jacobi_L')
+            if self.use_constant_L:
+                torch.save({'L_type': 'constant', 'A': self.A}, self.name+'/saved_models/without_jacobi_L')
+            else:
+                torch.save({'L_type': 'module', 'L_tensor': self.L_tensor}, self.name+'/saved_models/without_jacobi_L')
             errors_df.to_csv(self.name+"/data/errors_without.csv")
         elif method == "implicit":
             torch.save(self.energy, self.name+'/saved_models/implicit_jacobi_energy')
@@ -388,7 +479,7 @@ class LearnerIMR(Learner):
         """
         En = self.energy(mid_tensor)
         E_z = torch.autograd.grad(En.sum(), mid_tensor, only_inputs=True, create_graph=True)[0]
-        Lz = self.L_tensor(mid_tensor)
+        Lz = self.forward_L_tensor(mid_tensor)
         ham = torch.matmul(Lz, E_z.unsqueeze(2)).squeeze()
         return (zn_tensor - zn2_tensor)/self.dt + ham
                                                         
@@ -403,7 +494,7 @@ class LearnerIMR(Learner):
         :return: two values: mov_loss and jacobi_loss.
         """
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.L_tensor(mid_tensor)
+        Lz = self.forward_L_tensor(mid_tensor)
         jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
         return mov_loss, jacobi_loss
 
@@ -418,7 +509,7 @@ class LearnerIMR(Learner):
         :return: two values: mov_loss and jacobi_loss.
         """
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.L_tensor(mid_tensor)
+        Lz = self.forward_L_tensor(mid_tensor)
         #Jacobi
         jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
         return mov_loss, jacobi_loss
@@ -446,7 +537,7 @@ class LearnerRK4(Learner):
     def z_dot(self, zn_tensor):
         En = self.energy(zn_tensor)
         E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
-        Lz = self.L_tensor(zn_tensor)
+        Lz = self.forward_L_tensor(zn_tensor)
         return torch.matmul(Lz, E_z.unsqueeze(2)).squeeze()
 
     def mov_loss_without(self, zn_tensor, zn2_tensor, mid_tensor):
@@ -458,13 +549,13 @@ class LearnerRK4(Learner):
     
     def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.L_tensor(mid_tensor)
+        Lz = self.forward_L_tensor(mid_tensor)
         jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
         return mov_loss, jacobi_loss
     
     def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.L_tensor(mid_tensor)
+        Lz = self.forward_L_tensor(mid_tensor)
         jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
         return mov_loss, jacobi_loss
     
