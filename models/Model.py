@@ -2,6 +2,18 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from memory_profiler import profile
+
+import time
+def time_func(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        print("Function {} took {:.4f} seconds".format(func.__name__, end_time - start_time))
+        return result
+    return wrapper
+
 
 # The `EnergyNet` class is a neural network model that takes in input data and outputs a single value,
 # using a specified number of layers and neurons per layer.
@@ -88,8 +100,9 @@ class TensorNet(nn.Module):
         self.hidden = [nn.Linear(neurons, neurons) for _ in range(layers-1)]
         self.hidden = nn.ModuleList(self.hidden)
         self.outputSize = int(dim*(dim-1)/2)
+        #print(self.outputSize)
         self.outputDense = nn.Linear(neurons, self.outputSize)
-        self.sym_sing = -1
+        self.sym_sing = -1.0
         
         """# This locks the maximum bactch size
         # for variable maximum batch size, this would need to be performed every forward pass
@@ -120,10 +133,11 @@ class TensorNet(nn.Module):
             x = F.softplus(x)
             x = self.dropout(x)
 
+        # (B, p) = (B, d*(d-1)/2)
         data = self.outputDense(x)
         b_n = data.size(0) if data.dim() > 1 else 1
 
-        z = torch.zeros(b_n, self.dim, self.dim, device=data.device)        
+        z = torch.zeros(b_n, self.dim, self.dim, device=data.device, dtype=data.dtype)        
         tri_i0, tri_i1 = self.tri_i
         z[:, tri_i0, tri_i1] = data
 
@@ -132,7 +146,40 @@ class TensorNet(nn.Module):
         self.indices[2, :b_n*self.outputSize]] = data.ravel()"""
 
         output = z + self.sym_sing*z.transpose(1, 2)
+        # (B, d, d)
         return output
+
+    def get_jacobian(self, x):
+        B = x.size(0)
+        preactivations = []
+        x_processed = x
+        for layer in [self.inputDense] + list(self.hidden):
+            x_processed = layer(x_processed)
+            preactivations.append(x_processed)
+            x_processed = F.softplus(x_processed)
+
+        J_mlp = self.outputDense.weight.unsqueeze(0).expand(B, -1, -1)
+
+        for i in reversed(range(len(self.hidden))):
+            s = torch.sigmoid(preactivations[i + 1])
+            J_mlp = J_mlp * s.unsqueeze(1)
+            W_prev = self.hidden[i].weight
+            J_mlp = torch.matmul(J_mlp, W_prev)
+
+        s = torch.sigmoid(preactivations[0])
+        J_mlp = J_mlp * s.unsqueeze(1)
+        J_mlp = torch.matmul(J_mlp, self.inputDense.weight) # Shape: (B, p, d)
+        
+        final_J = torch.zeros(B, self.dim, self.dim, self.dim, device=x.device, dtype=x.dtype)
+        
+        row_indices, col_indices = self.tri_i
+
+        final_J[:, row_indices, col_indices, :] = J_mlp
+
+        final_J[:, col_indices, row_indices, :] = self.sym_sing * J_mlp
+
+        return final_J
+
         
 #antisymmetry
 class JacVectorNet(nn.Module):
