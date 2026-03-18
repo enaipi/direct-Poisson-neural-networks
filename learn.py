@@ -157,14 +157,13 @@ class Learner(object):
 
         return (zn_tensor - zn2_tensor)/self.dt + 0.5*(term1 + term2)
 
-    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L=None):
+    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor):
         """
         The function calculates the movement loss including Jacobi identity the for a given input tensor.
         
         :param zn_tensor: The zn_tensor is a tensor representing the current state of the system. It is used to calculate the energy and the Jacobian loss of the system
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the state at time `t+1`. It is used to calculate the loss for the movement of the system without using the Jacobian matrix
         :param mid_tensor: The `mid_tensor` parameter is a tensor representing the intermediate state between `zn_tensor` and `zn2_tensor`. It is used to calculate the loss function
-        :param reduced_L: The parameter "reduced_L" is a reduced Laplacian matrix. It is used in the calculation of the Jacobi loss
         :return: two values: \\ 1. The difference between `zn_tensor` and `zn2_tensor` divided by `self.dt` plus half of the sum of the matrix multiplication of `Lz` and `E_z` and the matrix multiplication of `Lz2` and `E_z2`. \\ 2. The `jacobi_loss` calculated using `zn_tensor`, `
         """
         En = self.energy(zn_tensor)
@@ -177,21 +176,36 @@ class Learner(object):
         Lz2 = self.forward_L_tensor(zn2_tensor)
 
         with torch.no_grad():
-            jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L)
+            jacobi_loss = self.jacobi_loss(zn_tensor)
 
         return (zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.matmul(Lz, E_z.unsqueeze(2)).squeeze() \
                                                         + torch.matmul(Lz2, E_z2.unsqueeze(2)).squeeze()), jacobi_loss
 
-    def jacobi_loss(self, zn_tensor, Lz, reduced_L):
+    def _forward_L_tensor_for_jacobi(self, zn_tensor):
+        if self.use_constant_L:
+            return self.L_tensor_func(zn_tensor)
+
+        # Keep Jacobi loss consistent with the analytical Jacobian from TensorNet.get_jacobian,
+        # which does not include dropout masks.
+        was_training = self.L_tensor.training
+        self.L_tensor.train(False)
+        try:
+            return self.L_tensor(zn_tensor)
+        finally:
+            self.L_tensor.train(was_training)
+
+    def jacobi_loss(self, zn_tensor):
         """
         The function `jacobi_loss` calculates the Jacobi loss (error in Jacobi identity) using the given inputs.
         
         :param zn_tensor: The `zn_tensor` parameter is a tensor representing the input to the function. It is used to compute the Jacobian loss.
-        :param Lz: Lz is a tensor representing the Jacobian matrix of the output with respect to the input. It has shape (m, n, n), where m is the number of samples and n is the number of input variables.
-        :param reduced_L: The parameter `reduced_L` is a tensor representing the reduced loss function
         :return: the sum of three terms: term1, term2, and term3.
         """
-        #Lz_grad = torch.autograd.functional.jacobian(reduced_L, zn_tensor, create_graph=True).permute(2, 0, 1, 3)
+        if self.use_constant_L:
+            # Constant antisymmetric tensors satisfy Jacobi identically.
+            return torch.zeros((), device=zn_tensor.device, dtype=zn_tensor.dtype)
+
+        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
         J = self.L_tensor.get_jacobian(zn_tensor)
         
         """B, dim, _ = Lz.shape
@@ -223,15 +237,15 @@ class Learner(object):
         del term1, term2, term3, J
         return jacobi_identity_error.pow(2).mean()
     
-    def jacobi_loss_og(self, zn_tensor, Lz, reduced_L):
+    def jacobi_loss_og(self, zn_tensor):
         """
         The function `jacobi_loss` calculates the Jacobi loss (error in Jacobi identity) using the given inputs.
         
         :param zn_tensor: The `zn_tensor` parameter is a tensor representing the input to the function. It is used to compute the Jacobian loss.
-        :param Lz: Lz is a tensor representing the Jacobian matrix of the output with respect to the input. It has shape (m, n, n), where m is the number of samples and n is the number of input variables.
-        :param reduced_L: The parameter `reduced_L` is a tensor representing the reduced loss function
         :return: the sum of three terms: term1, term2, and term3.
         """
+        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
+        reduced_L = lambda z: torch.sum(self._forward_L_tensor_for_jacobi(z), axis=0)
         Lz_grad = torch.autograd.functional.jacobian(reduced_L, zn_tensor, create_graph=True).permute(2, 0, 1, 3)
         #print(torch.max(Lz_grad))
         term1 = einsum('mkl,mijk->mijl', Lz, Lz_grad)
@@ -239,14 +253,13 @@ class Learner(object):
         term3 = term1.permute(0,3,1,2)
         return (term1 + term2 + term3).pow(2).mean()
 
-    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor):
         """
         The function `mov_loss_soft` calculates the movement loss and Jacobi loss for a given input tensor, using the "soft" method.
         
         :param zn_tensor: The zn_tensor is a tensor representing the current state of the system. It is used to calculate the energy and gradient of the energy with respect to zn_tensor
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the state at time `t+1`. It is used to calculate the movement loss and Jacobi loss in the `mov_loss_soft` function
         :param mid_tensor: The `mid_tensor` parameter is not used in the `mov_loss_soft` function. It is not clear what its purpose is without further context.
-        :param reduced_L: The parameter "reduced_L" is a tensor representing the reduced Laplacian matrix
         :return: two values: `mov_loss` and `jacobi_loss`.
         """
         En = self.energy(zn_tensor)
@@ -260,7 +273,7 @@ class Learner(object):
         mov_loss = (zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.matmul(Lz, E_z.unsqueeze(2)).squeeze() \
                                                         + torch.matmul(Lz2, E_z2.unsqueeze(2)).squeeze())
         #Jacobi
-        jacobi_loss = self.jacobi_loss(zn_tensor, Lz, reduced_L)
+        jacobi_loss = self.jacobi_loss(zn_tensor)
         return mov_loss, jacobi_loss
 
         
@@ -314,12 +327,11 @@ class Learner(object):
         #scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, 0.98, last_epoch= -1)
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs, eta_min=1e-6)
 
-        mov_loss, jacobi_loss, Lz, Lz2, Jz, Jz2, cass, cass2, reduced_L = None, None, None, None, None, None, None, None, None
+        mov_loss, jacobi_loss, Lz, Lz2, Jz, Jz2, cass, cass2 = None, None, None, None, None, None, None, None
         for epoch in range(epochs):
             print("\nStart of epoch %d" % (epoch,))
             start_time_train = time.time()
             #start_time = time.time()
-            reduced_L = lambda z: torch.sum(self.forward_L_tensor(z), axis=0)
 
             # Iterate over the batches of the dataset.
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.train_loader):
@@ -347,7 +359,7 @@ class Learner(object):
                 elif method == "implicit":
                     mov_loss = self.mov_loss_implicit(zn_tensor, zn2_tensor, mid_tensor)
                 elif method == "soft":
-                    mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
+                    mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor)
                 
                 mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
                 loss = mov_value
@@ -411,11 +423,11 @@ class Learner(object):
                     if self.use_constant_L:
                         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
                     else:
-                        mov_loss, jacobi_loss = self.mov_loss_without_with_jacobi(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
+                        mov_loss, jacobi_loss = self.mov_loss_without_with_jacobi(zn_tensor, zn2_tensor, mid_tensor)
                 elif method == "implicit":
                     mov_loss = self.mov_loss_implicit(zn_tensor, zn2_tensor, mid_tensor) #Jacobi identity automatically satisfied
                 elif method == "soft":
-                    mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor, reduced_L)
+                    mov_loss, jacobi_loss = self.mov_loss_soft(zn_tensor, zn2_tensor, mid_tensor)
 
                 #mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor*mov_loss)
                 mov_value = mov_loss.pow(2).mean() * prefactor**2
@@ -483,35 +495,31 @@ class LearnerIMR(Learner):
         ham = torch.matmul(Lz, E_z.unsqueeze(2)).squeeze()
         return (zn_tensor - zn2_tensor)/self.dt + ham
                                                         
-    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor):
         """
         The function calculates the moving loss and Jacobi loss for given tensors.
         
         :param zn_tensor: The zn_tensor is a tensor representing the current state of the system. It is used as input to calculate the mov_loss and jacobi_loss
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the second frame of a video sequence
         :param mid_tensor: The `mid_tensor` parameter is a tensor that represents the intermediate state of the model during training. It is typically used to calculate losses or perform other operations
-        :param reduced_L: The parameter "reduced_L" is a reduced version of the L tensor. It is used in the calculation of the Jacobi loss
         :return: two values: mov_loss and jacobi_loss.
         """
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.forward_L_tensor(mid_tensor)
-        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        jacobi_loss = self.jacobi_loss(mid_tensor)
         return mov_loss, jacobi_loss
 
-    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor):
         """
         The function calculates the moving loss and Jacobi loss for a given set of tensors.
         
         :param zn_tensor: The zn_tensor is a tensor representing the first set of input data for the mov_loss_soft function
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the second zero-normalized tensor
         :param mid_tensor: The `mid_tensor` parameter is a tensor that represents the intermediate output of a neural network model. It is used as input to calculate the moving loss and Jacobi loss
-        :param reduced_L: The parameter "reduced_L" is a reduced version of the L tensor. It is used in the calculation of the Jacobi loss
         :return: two values: mov_loss and jacobi_loss.
         """
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.forward_L_tensor(mid_tensor)
         #Jacobi
-        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        jacobi_loss = self.jacobi_loss(mid_tensor)
         return mov_loss, jacobi_loss
 
     def mov_loss_implicit(self, zn_tensor, zn2_tensor, mid_tensor):
@@ -547,16 +555,14 @@ class LearnerRK4(Learner):
         k4 = self.dt * self.z_dot(zn_tensor+ k3)
         return (zn_tensor-zn2_tensor)/self.dt + 1/6 * (k1 + 2*k2 + 2*k3 +k4)/self.dt
     
-    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+    def mov_loss_without_with_jacobi(self, zn_tensor, zn2_tensor, mid_tensor):
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.forward_L_tensor(mid_tensor)
-        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        jacobi_loss = self.jacobi_loss(mid_tensor)
         return mov_loss, jacobi_loss
     
-    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor, reduced_L):
+    def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor):
         mov_loss = self.mov_loss_without(zn_tensor, zn2_tensor, mid_tensor)
-        Lz = self.forward_L_tensor(mid_tensor)
-        jacobi_loss = self.jacobi_loss(mid_tensor, Lz, reduced_L) 
+        jacobi_loss = self.jacobi_loss(mid_tensor)
         return mov_loss, jacobi_loss
     
     def mov_loss_implicit(self, zn_tensor, zn2_tensor, mid_tensor):
@@ -603,9 +609,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
-    check_folder(args.folder_name) #check whether the folders data and saved_models exist, or create them
+    check_folder(args.name) #check whether the folders data and saved_models exist, or create them
 
-    learner = Learner(args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size, dt = args.dt, name = args.folder_name)
+    learner = Learner(args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size, dt = args.dt, name = args.name)
     learner.learn(method = args.method, learning_rate = args.learning_rate, epochs = args.epochs, prefactor = args.prefactor)
 
 
