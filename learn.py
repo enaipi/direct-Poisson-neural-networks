@@ -27,6 +27,8 @@ DEFAULT_jacobi_prefactor = 1.0
 DEFAULT_neurons = 64
 DEFAULT_layers = 2
 DEFAULT_folder_name = "."
+DEFAULT_jacobi_loss_mode = "exact"
+DEFAULT_hutchinson_samples = 1
 
 class Learner(object):
     """
@@ -35,7 +37,8 @@ class Learner(object):
     """
     def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons,
                  layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0,
-                 quad_features=False, no_data_to_gpu=True, D=10, use_constant_L=False):
+                 quad_features=False, no_data_to_gpu=True, D=10, use_constant_L=False,
+                 jacobi_loss_mode=DEFAULT_jacobi_loss_mode, hutchinson_samples=DEFAULT_hutchinson_samples):
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -124,6 +127,13 @@ class Learner(object):
 
         self.noise_sigma = -1 # add random noise to data
 
+        self.jacobi_loss_mode = jacobi_loss_mode
+        self.hutchinson_samples = hutchinson_samples
+        if self.jacobi_loss_mode not in ["exact", "hutchinson"]:
+            raise ValueError("Unknown jacobi_loss_mode '{}'. Choose 'exact' or 'hutchinson'.".format(self.jacobi_loss_mode))
+        if self.hutchinson_samples < 1:
+            raise ValueError("hutchinson_samples must be >= 1")
+
     def L_tensor_func(self, zn_tensor):
         L = self.A - self.A.t()
         return L.unsqueeze(0).repeat(zn_tensor.size(0), 1, 1)
@@ -205,6 +215,9 @@ class Learner(object):
             # Constant antisymmetric tensors satisfy Jacobi identically.
             return torch.zeros((), device=zn_tensor.device, dtype=zn_tensor.dtype)
 
+        if self.jacobi_loss_mode == "hutchinson":
+            return self.jacobi_loss_hutchinson(zn_tensor)
+
         Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
         J = self.L_tensor.get_jacobian(zn_tensor)
         
@@ -236,6 +249,39 @@ class Learner(object):
         jacobi_identity_error = term1 + term2 + term3
         del term1, term2, term3, J
         return jacobi_identity_error.pow(2).mean()
+
+    def jacobi_loss_hutchinson(self, zn_tensor):
+        """
+        Estimate Jacobi loss with Hutchinson's trick.
+        For random vectors v with E[v v^T] = I, E[||J(v)||_F^2] = ||JacobiTensor||_F^2.
+        """
+        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
+        J = self.L_tensor.get_jacobian(zn_tensor)
+
+        B, dim, _, _ = J.shape
+        estimate = torch.zeros((), device=zn_tensor.device, dtype=zn_tensor.dtype)
+
+        for _ in range(self.hutchinson_samples):
+            # Rademacher probe vectors (+1/-1) per batch sample.
+            v = torch.randint(0, 2, (B, dim), device=zn_tensor.device, dtype=torch.int64)
+            v = v.to(zn_tensor.dtype).mul_(2).sub_(1)
+
+            # term1_v[i,j] = sum_{k,l} L[k,l] * J[i,j,k] * v[l]
+            Lv = torch.bmm(Lz, v.unsqueeze(2)).squeeze(2)  # (B, dim)
+            term1_v = einsum('mijk,mk->mij', J, Lv)
+
+            # term2_v[i,j] = sum_{k,l} L[k,i] * J[j,l,k] * v[l]
+            J_contract_1 = einsum('mjlk,ml->mjk', J, v)
+            term2_v = einsum('mki,mjk->mij', Lz, J_contract_1)
+
+            # term3_v[i,j] = sum_{k,l} L[k,j] * J[l,i,k] * v[l]
+            J_contract_2 = einsum('mlik,ml->mik', J, v)
+            term3_v = einsum('mkj,mik->mij', Lz, J_contract_2)
+
+            jacobi_v = term1_v + term2_v + term3_v
+            estimate = estimate + jacobi_v.pow(2).mean() / dim
+
+        return estimate / self.hutchinson_samples
     
     def jacobi_loss_og(self, zn_tensor):
         """
@@ -605,13 +651,20 @@ if __name__ == "__main__":
     parser.add_argument("--model", type=str, help="Model = RB, HT, or P3D.", required = True)
     parser.add_argument("--name", default = DEFAULT_folder_name, type=str, help="Folder name")
     parser.add_argument("--method", default = "without", type=str, help="Method: without, implicit, or soft")
+    parser.add_argument("--jacobi_loss_mode", default=DEFAULT_jacobi_loss_mode, type=str,
+                        choices=["exact", "hutchinson"],
+                        help="Jacobi loss evaluation: exact or Hutchinson estimator")
+    parser.add_argument("--hutchinson_samples", default=DEFAULT_hutchinson_samples, type=int,
+                        help="Number of Hutchinson probe vectors for Jacobi loss")
     #parser.parse_args(['-h'])
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
     check_folder(args.name) #check whether the folders data and saved_models exist, or create them
 
-    learner = Learner(args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size, dt = args.dt, name = args.name)
+    learner = Learner(args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
+                      dt = args.dt, name = args.name, jacobi_loss_mode=args.jacobi_loss_mode,
+                      hutchinson_samples=args.hutchinson_samples)
     learner.learn(method = args.method, learning_rate = args.learning_rate, epochs = args.epochs, prefactor = args.prefactor)
 
 
