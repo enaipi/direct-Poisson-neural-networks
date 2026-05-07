@@ -45,6 +45,6 @@ import os
 import sys
 
 # Add the path to your Python code directory to sys.path
-sys.path.insert(0, os.path.abspath('..'))
-print(sys.path)
+# For src-layout, point to the src directory
+sys.path.insert(0, os.path.abspath(os.path.join('..', 'src')))
 

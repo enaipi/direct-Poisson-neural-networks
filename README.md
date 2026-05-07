@@ -2,38 +2,51 @@
 
 ## Typical workflow (samples initial conditions, simulates, learns, simulates learned, and compares):
 
-    python3 comparison.py --generate --steps=100 --implicit --soft --without --model=RB --folder_name=TEST
-    python3 plot_compare.py --plot_RB_errors --GT --without --implicit --soft --folder_name=TEST
+    comparison --generate --steps=100 --implicit --soft --without --model=RB --folder_name=TEST
+    plot-compare --plot_RB_errors --GT --without --implicit --soft --folder_name=TEST
 
-## It is also possible to compare just training an validation losses 
+## It is also possible to compare just training and validation losses 
 
-    python3 compare_train_errors.py
+    compare-train-errors
 
 ## Alternatively, you can do that step by step
 First generate dataset for training with:
 
-    python3 simulate.py --generate --steps=50000 --model=RB
+    simulate --generate --steps=50000 --model=RB
 
 for the rigid body (or HT for heavy top, or P3D for the particle in three dimensions)
 
 Then we train implicit and soft networks:
 
-    python3 learn.py --method=without --model=RB
+    learn --method=without --model=RB
 
 (or implicit or soft).
 
-Then choose a different initial conditions and see how well our network fits the evolution. If the initial condition is too different we will not get a good fit. If it is the same we will fit perfectly. 
+Then choose different initial conditions and see how well our network fits the evolution. If the initial condition is too different we will not get a good fit. If it is the same we will fit perfectly. 
 
-    python3 simulate.py --steps=500 --generate
-    python3 simulate.py --steps=500 --implicit
-    python3 simulate.py --steps=500 --soft
-    python3 simulate.py --steps=500 --without
+    simulate --steps=500 --generate
+    simulate --steps=500 --implicit
+    simulate --steps=500 --soft
+    simulate --steps=500 --without
 
 ## And we can plot and see:
 
-    python3 plot_compare.py --plot_m --plot_E --plot_L
+    plot-compare --plot_m --plot_E --plot_L
 
 Check training error and errors while learning. 
+
+## Building the Documentation
+
+Install documentation dependencies:
+
+    pip install -e ".[docs]"
+
+Build HTML documentation:
+
+    cd doc
+    make html
+
+The built documentation will be available in `doc/_build/html/`
 
 ## Typical arguments used for the training can be found in folder 
 

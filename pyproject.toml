@@ -48,6 +48,11 @@ dev = [
     "flake8",
     "mypy",
 ]
+docs = [
+    "sphinx>=4.0",
+    "sphinx-argparse>=0.4.0",
+    "alabaster>=0.7.0",
+]
 
 [project.scripts]
 comparison = "dpnn.comparison:main"
