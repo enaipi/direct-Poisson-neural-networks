@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 authors = [
-    {name = "Michal Šípka"},
+    {name = "Michal Pavelka, Michal Šípka, Michal Krpata"},
 ]
 keywords = [
     "neural networks",
