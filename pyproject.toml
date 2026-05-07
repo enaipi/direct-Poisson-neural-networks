@@ -1,0 +1,61 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dpnn"
+version = "1.0.0"
+description = "Direct Poisson Neural Networks - Learning non-symplectic mechanical systems"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Michal Šípka"},
+]
+keywords = [
+    "neural networks",
+    "hamiltonian systems",
+    "poisson structures",
+    "machine learning",
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+
+dependencies = [
+    "torch>=1.9.0",
+    "numpy>=1.19.0",
+    "pandas>=1.1.0",
+    "scipy>=1.5.0",
+    "scikit-learn>=0.24.0",
+    "torchmetrics>=0.8.0",
+    "matplotlib>=3.3.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "black",
+    "flake8",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://www.karlin.mff.cuni.cz/~pavelka/direct-poisson-neural-networks/"
+Documentation = "https://www.karlin.mff.cuni.cz/~pavelka/direct-poisson-neural-networks/"
+Repository = "https://github.com/sipka/direct-Poisson-neural-networks"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
