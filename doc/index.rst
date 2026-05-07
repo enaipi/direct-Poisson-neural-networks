@@ -88,12 +88,6 @@ The package is organized into the following modules:
    cli/learn
    cli/simulate
 
-.. toctree::
-   :maxdepth: 1
-   :caption: Legacy API Reference:
-
-   TrajectoryDataset
-
 Indices and tables
 ==================
 
