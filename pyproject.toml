@@ -49,6 +49,12 @@ dev = [
     "mypy",
 ]
 
+[project.scripts]
+comparison = "dpnn.comparison:main"
+simulate = "dpnn.simulation.simulate:main"
+learn = "dpnn.training.learn:main"
+plot-compare = "dpnn.postprocessing.plot_compare:main"
+
 [project.urls]
 Homepage = "https://www.karlin.mff.cuni.cz/~pavelka/direct-poisson-neural-networks/"
 Documentation = "https://www.karlin.mff.cuni.cz/~pavelka/direct-poisson-neural-networks/"
