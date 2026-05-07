@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>plot_compare.py &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <title>plot_compare.py (Legacy Reference) &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
     <link rel="stylesheet" type="text/css" href="_static/basic.css?v=eeb27264" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
@@ -14,8 +14,6 @@
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="learn" href="learn.html" />
-    <link rel="prev" title="comparison.py" href="comparison.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -33,8 +31,368 @@
 
           <div class="body" role="main">
             
-  <section id="plot-compare-py">
-<h1>plot_compare.py<a class="headerlink" href="#plot-compare-py" title="Link to this heading">¶</a></h1>
+  <section id="plot-compare-py-legacy-reference">
+<h1>plot_compare.py (Legacy Reference)<a class="headerlink" href="#plot-compare-py-legacy-reference" title="Link to this heading">¶</a></h1>
+<p>This file has been moved and reorganized. See the CLI reference:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/plot_compare.html">plot-compare - Visualize and Compare Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.get_frames_and_titles"><code class="docutils literal notranslate"><span class="pre">get_frames_and_titles()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.add_log"><code class="docutils literal notranslate"><span class="pre">add_log()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.remove_returns"><code class="docutils literal notranslate"><span class="pre">remove_returns()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.filter"><code class="docutils literal notranslate"><span class="pre">filter()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.sort_data"><code class="docutils literal notranslate"><span class="pre">sort_data()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.add_plot"><code class="docutils literal notranslate"><span class="pre">add_plot()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.fields_to_string"><code class="docutils literal notranslate"><span class="pre">fields_to_string()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.plot_field"><code class="docutils literal notranslate"><span class="pre">plot_field()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.split_data_to_forward_paths"><code class="docutils literal notranslate"><span class="pre">split_data_to_forward_paths()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.split_to_forward_paths"><code class="docutils literal notranslate"><span class="pre">split_to_forward_paths()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.normalize"><code class="docutils literal notranslate"><span class="pre">normalize()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.compat_error3D"><code class="docutils literal notranslate"><span class="pre">compat_error3D()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.dotUV"><code class="docutils literal notranslate"><span class="pre">dotUV()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.compat_error_superintegrable"><code class="docutils literal notranslate"><span class="pre">compat_error_superintegrable()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.get_learned_models"><code class="docutils literal notranslate"><span class="pre">get_learned_models()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.load_normalized_Ls"><code class="docutils literal notranslate"><span class="pre">load_normalized_Ls()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.reject_outliers"><code class="docutils literal notranslate"><span class="pre">reject_outliers()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.plot_first"><code class="docutils literal notranslate"><span class="pre">plot_first()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.generate_E_points"><code class="docutils literal notranslate"><span class="pre">generate_E_points()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.generate_L_points"><code class="docutils literal notranslate"><span class="pre">generate_L_points()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#dpnn.postprocessing.plot_compare.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#command-options">Command Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli/plot_compare.html#common-arguments">Common Arguments</a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/plot_compare.html#plotting-options">Plotting Options</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#example-workflows">Example Workflows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#output">Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/plot_compare.html#typical-workflow">Typical Workflow</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>For module documentation:</p>
+<dl class="py function" id="module-dpnn.postprocessing.plot_compare">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.get_frames_and_titles">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">get_frames_and_titles</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.get_frames_and_titles" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>get_frames_and_titles</cite> returns a list of dataframes and a list of titles based on the
+command line arguments.
+:return: two lists: <cite>fields</cite> and <cite>titles</cite>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.add_log">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">add_log</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.add_log" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.remove_returns">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">remove_returns</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ys</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.remove_returns" title="Link to this definition">¶</a></dt>
+<dd><p>The function removes points from the given lists that have an earlier timestep than their
+predecessor.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – A list of x-coordinates of points</p></li>
+<li><p><strong>ys</strong> – The parameter <cite>ys</cite> represents a list of values corresponding to the y-axis of a graph</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The function <cite>remove_returns</cite> returns two lists, <cite>newxs</cite> and <cite>newys</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.filter">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">filter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ys</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.filter" title="Link to this definition">¶</a></dt>
+<dd><p>The filter function takes two arrays, xs and ys, and returns new arrays containing every nth element
+of xs and ys, where n is specified by the plot_every argument.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – The parameter <cite>xs</cite> is a list of values. It is used to filter the x-values in the function</p></li>
+<li><p><strong>ys</strong> – The parameter <cite>ys</cite> represents a list of values that you want to filter. It is used to determine which values to keep and which ones to discard</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>two numpy arrays, <cite>newxs</cite> and <cite>newys</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.sort_data">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">sort_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ys</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.sort_data" title="Link to this definition">¶</a></dt>
+<dd><p>The function sorts two arrays, xs and ys, based on the values in xs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – An array or list of values representing the x-coordinates of the data points</p></li>
+<li><p><strong>ys</strong> – The parameter “ys” represents a list or array of values that are associated with the corresponding values in the “xs” parameter</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>two arrays, <cite>newxs</cite> and <cite>newys</cite>, which are the sorted versions of the input arrays <cite>xs</cite> and <cite>ys</cite> respectively.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.add_plot">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">add_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">apply_filter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">split</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.add_plot" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>add_plot</cite> takes in an <cite>ax</cite> object, x and y data, and optional parameters to apply
+filters and split the data into forward paths, and plots the data on the given axes object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ax</strong> – The ax parameter is the matplotlib Axes object on which the plot will be drawn</p></li>
+<li><p><strong>x</strong> – The x-axis values for the plot</p></li>
+<li><p><strong>y</strong> – The <cite>y</cite> parameter is a list or array of values representing the y-coordinates of the data points to be plotted</p></li>
+<li><p><strong>name</strong> – The name parameter is a string that represents the label for the plot. It is used to identify the data being plotted in the legend of the plot</p></li>
+<li><p><strong>apply_filter</strong> – apply_filter is a boolean parameter that determines whether or not to apply a filter to the data before plotting. If apply_filter is set to True, the function will call the filter function on the x and y data before plotting. If apply_filter is set to False, the function will plot the original x, defaults to False (optional)</p></li>
+<li><p><strong>split</strong> – The “split” parameter determines whether the data should be split into separate paths before plotting. If set to True, the data will be split into separate paths based on the x-values. Each path will be plotted separately. If set to False, the data will be plotted as a single continuous line, defaults to True (optional)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.fields_to_string">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">fields_to_string</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fields</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.fields_to_string" title="Link to this definition">¶</a></dt>
+<dd><p>The function “fields_to_string” takes a list of fields and returns a string representation of the
+fields separated by underscores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fields</strong> – A list of fields, where each field is a string</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a string that concatenates all the elements in the “fields” list, separated by underscores.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_field">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_field</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fields</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">['mx',</span> <span class="pre">'my',</span> <span class="pre">'mz']</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_field" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>plot_field</cite> plots specified fields from multiple data frames and saves the figure if
+specified.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>fields</strong> – The <cite>fields</cite> parameter is a list of strings that specifies the fields to be plotted. By default, it is set to <cite>[“mx”, “my”, “mz”]</cite>, which means that the function will plot the fields “mx”, “my”, and “mz”. However, you</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.split_data_to_forward_paths">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">split_data_to_forward_paths</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">xs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ys</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.split_data_to_forward_paths" title="Link to this definition">¶</a></dt>
+<dd><p>The function split_data_to_forward_paths takes two lists, xs and ys, and splits the data into
+forward paths based on the values in xs.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>xs</strong> – A list of time values. Each value represents a time point in a sequence</p></li>
+<li><p><strong>ys</strong> – The <cite>ys</cite> parameter represents a list of values. It is assumed that each value in <cite>ys</cite> corresponds to a specific time point</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a list of lists, where each inner list represents a forward path. Each inner list contains the corresponding values from the <cite>ys</cite> list that belong to that forward path.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.split_to_forward_paths">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">split_to_forward_paths</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.split_to_forward_paths" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>split_to_forward_paths</cite> takes a data frame <cite>df</cite> and a field name <cite>field</cite>, and returns
+an array of forward paths for the given field.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> – The parameter “df” is a data frame that contains the time series data. It should have at least two columns: “time” and the specified field</p></li>
+<li><p><strong>field</strong> – The “field” parameter is the name of the column in the data frame that contains the values to be split into forward paths</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>an array of forward paths for the given data frame and field.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.normalize">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">normalize</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">Ls</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.normalize" title="Link to this definition">¶</a></dt>
+<dd><p>The function “normalize” takes a list of vectors as input and returns the normalized vectors in
+canonical form.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>Ls</strong> – Ls is a list of vectors. Each vector represents a time step in a sequence. The function normalize takes this list of vectors and normalizes them. The normalization is done in two steps:</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the normalized list of vectors, where each vector is normalized to the canonical form.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.compat_error3D">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">compat_error3D</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">J_exact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">J</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">m</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.compat_error3D" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>compat_error3D</cite> calculates the compatibility error between the exact Jacobian
+<cite>J_exact</cite> and the estimated Jacobian <cite>J</cite> for a given input <cite>m</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>J_exact</strong> – J_exact is a tensor representing the exact Jacobian matrix. It has shape (batch_size, 3, 3), where batch_size is the number of samples in the batch. Each element J_exact[i] is a 3x3 matrix representing the Jacobian matrix for the i-th sample</p></li>
+<li><p><strong>J</strong> – J is a tensor of shape (batch_size, 3), where each row represents a 3D vector</p></li>
+<li><p><strong>m</strong> – The parameter <cite>m</cite> represents the input tensor or variable. It is used to compute the gradients of the loss function <cite>J</cite> with respect to <cite>m</cite></p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The function <cite>compat_error3D</cite> returns the square of the sum of the element-wise multiplication between <cite>J_exact</cite> and <cite>rot_J</cite>, along the axis 1.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.dotUV">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">dotUV</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">U</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">V</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.dotUV" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>dotUV</cite> calculates the dot product between corresponding rows of two matrices <cite>U</cite> and
+<cite>V</cite>.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>U</strong> – U is a numpy array representing a matrix with shape (n, m), where n is the number of rows and m is the number of columns</p></li>
+<li><p><strong>V</strong> – The parameter V is a numpy array representing a matrix</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a list of dot products between corresponding rows of matrices U and V.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.compat_error_superintegrable">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">compat_error_superintegrable</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">U_exact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">V_exact</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">U</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">V</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.compat_error_superintegrable" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>compat_error_superintegrable</cite> calculates the square of the compatibility error for a
+superintegrable system.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>U_exact</strong> – The parameter U_exact represents the exact solution for the variable U. It is a numpy array that contains the values of U at each point in the domain</p></li>
+<li><p><strong>V_exact</strong> – The parameter V_exact is a variable representing the exact solution for V</p></li>
+<li><p><strong>U</strong> – The parameter U is a numpy array representing a vector U</p></li>
+<li><p><strong>V</strong> – The parameter V is a numpy array representing a vector</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the square of the value of Lambda.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.get_learned_models">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">get_learned_models</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.get_learned_models" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>get_learned_models()</cite> returns a dictionary of learned models based on the command line
+arguments provided.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>a dictionary of learned models. Each model is represented by a key-value pair in the dictionary. The key represents the type of model (“without”, “soft”, “implicit”), and the value is another dictionary containing the specific models for energy and L (or J) depending on the type of model.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.load_normalized_Ls">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">load_normalized_Ls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">df</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.load_normalized_Ls" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>load_normalized_Ls</cite> takes a dataframe <cite>df</cite> and a dimension <cite>dim</cite> as input, and returns
+a normalized array <cite>Ls</cite> based on the dimension.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>df</strong> – The parameter <cite>df</cite> is a DataFrame object that contains the data from which the normalized L matrices will be constructed</p></li>
+<li><p><strong>dim</strong> – The parameter “dim” represents the dimensionality of the data. It can take values of 3, 4, or 6</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>a numpy array of normalized L matrices.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.reject_outliers">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">reject_outliers</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">m</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.reject_outliers" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>reject_outliers</cite> removes outliers from a given dataset using a specified threshold.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> – The “data” parameter is the input array or list of data points from which outliers need to be rejected</p></li>
+<li><p><strong>m</strong> – The parameter “m” in the function “reject_outliers” is used to determine the threshold for rejecting outliers. It is multiplied by the standard deviation of the data to define the range within which data points are considered non-outliers. Any data point that falls outside this range is considered an outlier and, defaults to 3 (optional)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the filtered data after removing outliers.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_first">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_first</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_first" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>plot_first</cite> plots different fields based on the given arguments and saves the figure
+if specified.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>field</strong> – The <cite>field</cite> parameter is a string that represents the field or variable you want to plot. It is used to access the corresponding data from the <cite>dfgt</cite>, <cite>dfls</cite>, <cite>dfli</cite>, and <cite>dflw</cite> dataframes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.generate_E_points">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">generate_E_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">energy</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.generate_E_points" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>generate_E_points</cite> generates random initial conditions for a given energy function and
+returns the corresponding points in space and their energies.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>args</strong> – The <cite>args</cite> parameter is a dictionary or object that contains various parameters for the function. It is used to specify the initial conditions and other settings for generating the points</p></li>
+<li><p><strong>energy</strong> – The <cite>energy</cite> parameter is a function that takes in a tensor <cite>total_m</cite> and calculates the energy based on the values in <cite>total_m</cite>. The <cite>total_m</cite> tensor represents the initial conditions for the system, with each row representing a different set of initial conditions.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The function <cite>generate_E_points</cite> returns different variables depending on the value of <cite>args.model</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.generate_L_points">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">generate_L_points</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">L_tensor</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.generate_L_points" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>generate_L_points</cite> generates random initial conditions for a given model and returns
+the corresponding L points.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>args</strong> – The “args” parameter is a set of arguments that specify the configuration for generating the points. It likely contains information such as the initial conditions for the points, the density of the points, and the model type</p></li>
+<li><p><strong>L_tensor</strong> – The <cite>L_tensor</cite> is a function that takes a batch of initial conditions <cite>total_m_batched</cite> as input and returns the corresponding output <cite>L_batched</cite>. It is used to compute the output <cite>L</cite> for each batch of initial conditions in the function <cite>generate_L_points</cite></p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The function <cite>generate_L_points</cite> returns different variables depending on the value of <cite>args.model</cite>.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.main">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.main" title="Link to this definition">¶</a></dt>
+<dd><p>Main entry point for plot_compare script.</p>
+</dd></dl>
+
 </section>
 
 
@@ -63,22 +421,30 @@
     </div>
 </search>
 <script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
-<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="comparison.html">comparison.py</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">plot_compare.py</a></li>
-<li class="toctree-l1"><a class="reference internal" href="learn.html">learn</a></li>
-<li class="toctree-l1"><a class="reference internal" href="models.html">Models</a></li>
-<li class="toctree-l1"><a class="reference internal" href="simulate.html">simulate.py</a></li>
-<li class="toctree-l1"><a class="reference internal" href="TrajectoryDataset.html">TrajectoryDataset.py</a></li>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/training.html">Training (dpnn.training)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/postprocessing.html">Postprocessing (dpnn.postprocessing)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/plot_compare.html">plot-compare - Visualize and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Legacy API Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="TrajectoryDataset.html">TrajectoryDataset (Legacy API Reference)</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="comparison.html" title="previous chapter">comparison.py</a></li>
-      <li>Next: <a href="learn.html" title="next chapter">learn</a></li>
   </ul></li>
 </ul>
 </div>
