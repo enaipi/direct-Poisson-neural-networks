@@ -1,6 +1,6 @@
 # Direct Poisson Neural Networks
 
-[![Documentation](https://img.shields.io/badge/docs-latest-blue?style=flat-square)](https://www.karlin.mff.cuni.cz/~pavelka/direct-poisson-neural-networks/)
+[![Documentation](https://img.shields.io/badge/docs-latest-blue?style=flat-square)](https://enaipi.github.io/direct-Poisson-neural-networks/)
 
 ## There are the following scripts available:
 
