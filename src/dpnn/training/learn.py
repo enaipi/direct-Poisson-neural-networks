@@ -28,7 +28,7 @@ DEFAULT_neurons = 64
 DEFAULT_layers = 2
 DEFAULT_folder_name = "."
 DEFAULT_jacobi_loss_mode = "exact"
-DEFAULT_hutchinson_samples = 1
+DEFAULT_hutchinson_samples = 5
 
 class Learner(object):
     """
@@ -129,8 +129,8 @@ class Learner(object):
 
         self.jacobi_loss_mode = jacobi_loss_mode
         self.hutchinson_samples = hutchinson_samples
-        if self.jacobi_loss_mode not in ["exact", "hutchinson"]:
-            raise ValueError("Unknown jacobi_loss_mode '{}'. Choose 'exact' or 'hutchinson'.".format(self.jacobi_loss_mode))
+        if self.jacobi_loss_mode not in ["manual", "exact", "exact_backward", "hutchinson", "hutchinson_batch", "spectral"]:
+            raise ValueError("Unknown jacobi_loss_mode '{}'. Choose 'exact', 'hutchinson' or 'spectral'.".format(self.jacobi_loss_mode))
         if self.hutchinson_samples < 1:
             raise ValueError("hutchinson_samples must be >= 1")
 
@@ -218,70 +218,120 @@ class Learner(object):
         if self.jacobi_loss_mode == "hutchinson":
             return self.jacobi_loss_hutchinson(zn_tensor)
 
-        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
-        J = self.L_tensor.get_jacobian(zn_tensor)
+        elif self.jacobi_loss_mode == "manual":
+            Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
+            J = self.L_tensor.get_jacobian(zn_tensor)
+
+            term1 = einsum('mkl,mijk->mijl', Lz, J)
         
-        """B, dim, _ = Lz.shape
+            term2 = term1.permute(0, 2, 3, 1)
+            term3 = term1.permute(0, 3, 1, 2)
+            
+            jacobi_identity_error = term1 + term2 + term3
+            del term1, term2, term3, J
+            return jacobi_identity_error.pow(2).mean()
         
-        tri_i0, tri_i1 = self.L_tensor.tri_i
-
-        # p = dim*(2*dim - 1)
-        Lz_flat = Lz[:, tri_i0, tri_i1]  # (B, p)
-
-        term1_flat = Lz_flat.unsqueeze(2) * J  # (B, p, dim)
-
-        term1 = torch.empty(B, dim, dim, dim, device=term1_flat.device)
-
-        term1[:, tri_i0, tri_i1, :] = term1_flat
-        # self.L_tensor.sym_sing = -1
-        term1[:, tri_i1, tri_i0, :] = self.L_tensor.sym_sing * term1_flat  # (B, dim, dim, dim)
-        # torch.mul(self.L_tensor.sym_sing, term1_flat, out=term1[:, tri_i1, tri_i0, :])
-
-        out = term1.clone()
-        out.add_(term1.permute(0,2,3,1))
-        out.add_(term1.permute(0,3,1,2))"""
-
-        term1 = einsum('mkl,mijk->mijl', Lz, J)
-    
-        term2 = term1.permute(0, 2, 3, 1)
-        term3 = term1.permute(0, 3, 1, 2)
+        elif self.jacobi_loss_mode == "exact":
+            return self.jacobi_loss_forward(zn_tensor)
         
-        jacobi_identity_error = term1 + term2 + term3
-        del term1, term2, term3, J
-        return jacobi_identity_error.pow(2).mean()
+        elif self.jacobi_loss_mode == "exact_backward":
+            return self.jacobi_loss_og(zn_tensor)
+        
+        elif self.jacobi_loss_mode == "hutchinson":
+            return self.jacobi_loss_hutchinson(zn_tensor)
+        
+        elif self.jacobi_loss_mode == "hutchinson_batch":
+            return self.jacobi_loss_hutchinson_batched(zn_tensor)
+        
+        elif self.jacobi_loss_mode == "spectral":
+            return self.jacobi_loss_spectral(zn_tensor)
 
     def jacobi_loss_hutchinson(self, zn_tensor):
         """
         Estimate Jacobi loss with Hutchinson's trick.
         For random vectors v with E[v v^T] = I, E[||J(v)||_F^2] = ||JacobiTensor||_F^2.
         """
-        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
-        J = self.L_tensor.get_jacobian(zn_tensor)
-
-        B, dim, _, _ = J.shape
+        B, dim = zn_tensor.shape
         estimate = torch.zeros((), device=zn_tensor.device, dtype=zn_tensor.dtype)
 
-        for _ in range(self.hutchinson_samples):
-            # Rademacher probe vectors (+1/-1) per batch sample.
-            v = torch.randint(0, 2, (B, dim), device=zn_tensor.device, dtype=torch.int64)
-            v = v.to(zn_tensor.dtype).mul_(2).sub_(1)
+        z_detached = zn_tensor.detach().requires_grad_(True)
+            
+        Lz = self._forward_L_tensor_for_jacobi(z_detached)
 
-            # term1_v[i,j] = sum_{k,l} L[k,l] * J[i,j,k] * v[l]
-            Lv = torch.bmm(Lz, v.unsqueeze(2)).squeeze(2)  # (B, dim)
-            term1_v = einsum('mijk,mk->mij', J, Lv)
+        for i in range(self.hutchinson_samples):
+            # sample random vectors with elements from the Rademacher distribution
+            u = torch.randint(0, 2, (B, dim), device=zn_tensor.device).float() * 2 - 1
+            v = torch.randint(0, 2, (B, dim), device=zn_tensor.device).float() * 2 - 1
+            w = torch.randint(0, 2, (B, dim), device=zn_tensor.device).float() * 2 - 1
 
-            # term2_v[i,j] = sum_{k,l} L[k,i] * J[j,l,k] * v[l]
-            J_contract_1 = einsum('mjlk,ml->mjk', J, v)
-            term2_v = einsum('mki,mjk->mij', Lz, J_contract_1)
+            # Computes one term of the cyclic sum 
+            def compute_term_vec(vec_a, vec_b, vec_c):
+                # Project the L matrix to a scalar with 2 vectors (b^T L c)
+                S = torch.einsum('bi,bij,bj->b', vec_b, Lz, vec_c)
+                
+                # Project the matrix to a vector with the 3rd vector (L a)
+                La = torch.einsum('bij,bj->bi', Lz, vec_a)
+                
+                grad_S = torch.autograd.grad(
+                    S.sum(), 
+                    z_detached, 
+                    create_graph=True, 
+                    retain_graph=True
+                )[0]
+                
+                return (La * grad_S).sum(dim=1)
+            
+            # Compute the three cyclic terms
+            term1 = compute_term_vec(u, v, w)
+            term2 = compute_term_vec(v, w, u)
+            term3 = compute_term_vec(w, u, v)
 
-            # term3_v[i,j] = sum_{k,l} L[k,j] * J[l,i,k] * v[l]
-            J_contract_2 = einsum('mlik,ml->mik', J, v)
-            term3_v = einsum('mkj,mik->mij', Lz, J_contract_2)
-
-            jacobi_v = term1_v + term2_v + term3_v
-            estimate = estimate + jacobi_v.pow(2).mean() / dim
+            jacobi_v = (term1 + term2 + term3).pow(2)
+            estimate = estimate + jacobi_v.mean()
 
         return estimate / self.hutchinson_samples
+    
+    def jacobi_loss_hutchinson_batched(self, zn_tensor):
+        """
+        Estimate Jacobi loss with Hutchinson's trick with all samples calculated in a batch at once.
+        More efficient for lower dimensions.
+        """
+        B, dim = zn_tensor.shape
+        total_samples = self.hutchinson_samples * B
+        
+        z_exp = zn_tensor.repeat(self.hutchinson_samples, 1).detach().requires_grad_(True)
+        L_exp = self._forward_L_tensor_for_jacobi(z_exp)
+        
+        # sample random vectors with elements from the Rademacher distribution
+        u = torch.randint(0, 2, (total_samples, dim), device=zn_tensor.device).float() * 2 - 1
+        v = torch.randint(0, 2, (total_samples, dim), device=zn_tensor.device).float() * 2 - 1
+        w = torch.randint(0, 2, (total_samples, dim), device=zn_tensor.device).float() * 2 - 1
+
+        # Computes one term of the cyclic sum 
+        def compute_term_vec(vec_a, vec_b, vec_c, retain_graph=True):
+            # Project the L matrix to a scalar with 2 vectors (b^T L c)
+            S = torch.einsum('bi,bij,bj->b', vec_b, L_exp, vec_c)
+            
+            # Project the matrix to a vector with the 3rd vector (L a)
+            La = torch.einsum('bij,bj->bi', L_exp, vec_a)
+            
+            grad_S = torch.autograd.grad(
+                S.sum(), 
+                z_exp, 
+                create_graph=True, 
+                retain_graph=retain_graph
+            )[0]
+            
+            return (La * grad_S).sum(dim=1)
+
+        # Compute the three cyclic terms
+        term1 = compute_term_vec(u, v, w, retain_graph=True)
+        term2 = compute_term_vec(v, w, u, retain_graph=True)
+        term3 = compute_term_vec(w, u, v, retain_graph=True) 
+        
+        loss_i = (term1 + term2 + term3).pow(2)
+        
+        return loss_i.mean()
     
     def jacobi_loss_og(self, zn_tensor):
         """
@@ -298,6 +348,93 @@ class Learner(object):
         term2 = term1.permute(0,2,3,1)
         term3 = term1.permute(0,3,1,2)
         return (term1 + term2 + term3).pow(2).mean()
+    
+    def jacobi_loss_forward(self, zn_tensor):
+        """
+        Exact squared Frobenius norm of the Jacobiator using forward-mode AD.
+        """
+        z_detached = zn_tensor.detach()
+        
+        # Helper function for vmap
+        def compute_single_L(z_single):
+            return self._forward_L_tensor_for_jacobi(z_single.unsqueeze(0)).squeeze(0)
+
+        batch_jac = torch.func.vmap(torch.func.jacfwd(compute_single_L))(z_detached)
+        
+        # Compute the L tensor for the batch
+        Lz = self._forward_L_tensor_for_jacobi(zn_tensor)
+        
+        # Compute cyclic terms
+        term1 = torch.einsum('bil,bjkl->bijk', Lz, batch_jac)
+        term2 = term1.permute(0, 2, 3, 1)
+        term3 = term1.permute(0, 3, 1, 2)
+        
+        return (term1 + term2 + term3).pow(2).mean()
+    
+    def jacobi_loss_spectral(self, zn_tensor):
+        """
+        Iterative approximation of the spectral norm of the Jacobiator using power iteration.
+        """
+        B, dim = zn_tensor.shape
+        
+        z_detached = zn_tensor.detach().requires_grad_(True)
+        Lz = self._forward_L_tensor_for_jacobi(z_detached)
+
+        # Initialize and normalize random vectors
+        u = torch.randn(B, dim, device=zn_tensor.device, dtype=zn_tensor.dtype)
+        v = torch.randn(B, dim, device=zn_tensor.device, dtype=zn_tensor.dtype)
+        w = torch.randn(B, dim, device=zn_tensor.device, dtype=zn_tensor.dtype)
+        
+        u = torch.nn.functional.normalize(u, dim=1)
+        v = torch.nn.functional.normalize(v, dim=1)
+        w = torch.nn.functional.normalize(w, dim=1)
+
+        def get_jacobiator_scalar(u_vec, v_vec, w_vec, create_graph=False):
+            # Computes the contraction of the Jacobiator with the vectors
+            def cyclic_term(a, b, c):
+                S = torch.einsum('bi,bij,bj->b', b, Lz, c)
+                grad_S = torch.autograd.grad(
+                    S.sum(), 
+                    z_detached, 
+                    create_graph=create_graph, 
+                    retain_graph=True
+                )[0]
+                aL = torch.einsum('bi,bij->bj', a, Lz)
+                return (aL * grad_S).sum(dim=1)
+                
+            return cyclic_term(u_vec, v_vec, w_vec) + \
+                   cyclic_term(v_vec, w_vec, u_vec) + \
+                   cyclic_term(w_vec, u_vec, v_vec)
+
+        i = 0
+        while i < self.hutchinson_samples:
+            # Update u
+            u.requires_grad_(True)
+            J_u = get_jacobiator_scalar(u, v, w, create_graph=True)
+            grad_u = torch.autograd.grad(J_u.sum(), u)[0]
+            u = torch.nn.functional.normalize(grad_u.detach(), dim=1)
+            i += 1
+            
+            if i < self.hutchinson_samples:
+                # Update v
+                v.requires_grad_(True)
+                J_v = get_jacobiator_scalar(u, v, w, create_graph=True)
+                grad_v = torch.autograd.grad(J_v.sum(), v)[0]
+                v = torch.nn.functional.normalize(grad_v.detach(), dim=1)
+                i += 1
+            
+            if i < self.hutchinson_samples:
+                # Update w
+                w.requires_grad_(True)
+                J_w = get_jacobiator_scalar(u, v, w, create_graph=True)
+                grad_w = torch.autograd.grad(J_w.sum(), w)[0]
+                w = torch.nn.functional.normalize(grad_w.detach(), dim=1)
+                i += 1
+
+        final_violation = get_jacobiator_scalar(u, v, w, create_graph=True)
+        
+        return (final_violation ** 2).mean()
+    
 
     def mov_loss_soft(self, zn_tensor, zn2_tensor, mid_tensor):
         """

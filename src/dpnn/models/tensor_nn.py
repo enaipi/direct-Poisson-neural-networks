@@ -54,7 +54,16 @@ class TensorNet(nn.Module):
 
         z = torch.zeros(b_n, self.dim, self.dim, device=data.device, dtype=data.dtype)        
         tri_i0, tri_i1 = self.tri_i
-        z[:, tri_i0, tri_i1] = data
+        
+        flat_idx = tri_i0 * self.dim + tri_i1
+        
+        expanded_idx = flat_idx.unsqueeze(0).expand(b_n, -1)
+        
+        zeros_flat = torch.zeros(b_n, self.dim * self.dim, device=data.device, dtype=data.dtype)
+        
+        L_full_flat = zeros_flat.scatter(dim=1, index=expanded_idx, src=data)
+        
+        z = L_full_flat.view(b_n, self.dim, self.dim)
 
         output = z + self.sym_sing * z.transpose(1, 2)
         return output
