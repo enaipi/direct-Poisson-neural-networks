@@ -13,7 +13,8 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
-from dpnn.models.energy import EnergyNet, TensorNet, JacVectorNet 
+from dpnn.models.energy_nn import EnergyNet
+from dpnn.models.tensor_nn import TensorNet, JacVectorNet
 from dpnn.data.dataset import TrajectoryDataset
 
 #declare default values of parameters

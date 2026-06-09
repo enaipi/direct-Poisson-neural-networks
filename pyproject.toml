@@ -56,8 +56,8 @@ docs = [
 
 [project.scripts]
 comparison = "dpnn.comparison:main"
-simulate = "dpnn.simulation.simulate:main"
-learn = "dpnn.training.learn:main"
+simulate = "dpnn.simulation.simulator:main"
+learn = "dpnn.training.learner:main"
 plot-compare = "dpnn.postprocessing.plot_compare:main"
 
 [project.urls]

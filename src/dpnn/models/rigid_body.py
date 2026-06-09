@@ -6,7 +6,8 @@ import numpy as np
 
 import torch
 
-from dpnn.models.energy import EnergyNet, TensorNet, JacVectorNet
+from dpnn.models.energy_nn import EnergyNet
+from dpnn.models.tensor_nn import TensorNet, JacVectorNet
 from dpnn.training import DEFAULT_folder_name
 
 def load_models(name = DEFAULT_folder_name, method = "without", mx = torch.zeros((1,1)), device="cpu"):
