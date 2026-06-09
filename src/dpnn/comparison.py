@@ -352,7 +352,7 @@ def main():
     parser.add_argument("--dimensions", default=10, type=int, help="The spatial dimension of the particle system 'D'.")
     parser.add_argument("--const_L", default=False, action="store_true", help="Whether to use a constant L matrix.")
     parser.add_argument("--jacobi_loss_mode", default=DEFAULT_jacobi_loss_mode, type=str,
-                        choices=["exact", "hutchinson"],
+                        choices=["manual", "exact", "exact_backward", "hutchinson", "hutchinson_batch", "spectral"],
                         help="Jacobi loss evaluation: exact or Hutchinson estimator")
     parser.add_argument("--hutchinson_samples", default=DEFAULT_hutchinson_samples, type=int,
                         help="Number of Hutchinson probe vectors for Jacobi loss")
@@ -433,18 +433,21 @@ def main():
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
+                                D=args.dimensions, 
                                 jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
+                                D=args.dimensions, 
                                 jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                             dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                             dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                             simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
+                            D=args.dimensions, 
                             jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
         learner.learn(method = "soft", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor, jac_prefactor = args.jac_prefactor)
     if args.without:
