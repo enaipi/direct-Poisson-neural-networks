@@ -6,6 +6,7 @@ from math import sqrt
 from dpnn.models.rigid_body import *
 import pandas as pd
 from dpnn.training.learner import DEFAULT_folder_name
+import torch
 
 def save_simulation(data_frame, file_name): #save data to file_name
     """
