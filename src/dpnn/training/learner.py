@@ -39,7 +39,8 @@ class Learner(object):
     def __init__(self, model, batch_size = DEFAULT_batch_size, simulation_batch_size = DEFAULT_batch_size, dt = DEFAULT_dt, neurons = DEFAULT_neurons,
                  layers = DEFAULT_layers, name = DEFAULT_folder_name, device = "cpu", dissipative = False, dropout_rate=0.0,
                  quad_features=False, no_data_to_gpu=True, D=10, use_constant_L=False,
-                 jacobi_loss_mode=DEFAULT_jacobi_loss_mode, hutchinson_samples=DEFAULT_hutchinson_samples):
+                 jacobi_loss_mode=DEFAULT_jacobi_loss_mode, hutchinson_samples=DEFAULT_hutchinson_samples,
+                 external_data_path=None, external_data_simple_format=False):
         """
         This function initializes a Learner object for a given model, with specified parameters and
         datasets.
@@ -75,11 +76,18 @@ class Learner(object):
         #self.logdir = os.path.join("logs", "{}-{}-{}".format(
         #    os.path.basename(globals().get("__file__", "notebook")),
         #    datetime.datetime.now().strftime("%Y-%m-%d_%H%M%S"),
-        #    ",".join(("{}={}".format(re.sub("(.)[^_]*_?", r"\1", key), value) for key, value in sorted(vars(args).items())))
+        #    ",".join((f"{re.sub('(.)[^_]*_?', r'\\1', key)}={value}" for key, value in sorted(vars(args).items())))
         #))
 
         #start_time = time.time()
-        self.df = pd.read_csv(name+"/"+DEFAULT_dataset, dtype=np.float32)
+        if external_data_path: # Load external data if provided
+            self.df = pd.read_csv(external_data_path, dtype=np.float32)
+            print(f"Learner initialized with external data from: {external_data_path}")
+            # If in simple format, convert to old/new pairs for TrajectoryDataset
+            if external_data_simple_format:
+                self.df = self._convert_simple_to_old_new(self.df, model, dim)
+        else: # Otherwise, load default dataset
+            self.df = pd.read_csv(name+"/"+DEFAULT_dataset, dtype=np.float32)
         #end_time = time.time()
         #print(end_time-start_time)
 
@@ -131,9 +139,45 @@ class Learner(object):
         self.jacobi_loss_mode = jacobi_loss_mode
         self.hutchinson_samples = hutchinson_samples
         if self.jacobi_loss_mode not in ["manual", "exact", "exact_backward", "hutchinson", "hutchinson_batch", "spectral"]:
-            raise ValueError("Unknown jacobi_loss_mode '{}'. Choose 'exact', 'hutchinson' or 'spectral'.".format(self.jacobi_loss_mode))
+            raise ValueError(f"Unknown jacobi_loss_mode '{self.jacobi_loss_mode}'. Choose 'exact', 'hutchinson' or 'spectral'.")
         if self.hutchinson_samples < 1:
             raise ValueError("hutchinson_samples must be >= 1")
+
+    def _convert_simple_to_old_new(self, df_simple, model, dim):
+        # Assuming df_simple has 'time' and state variables (e.g., 'mx', 'my', 'mz')
+        # It needs to be converted to 'old_mx', 'mx' format.
+        converted_data = []
+
+        # Determine state variable column names based on the model
+        state_var_cols = []
+        if model == "RB":
+            state_var_cols = ["mx", "my", "mz"]
+        elif model in ["HT", "P3D", "K3D"]:
+            state_var_cols = ["mx", "my", "mz", "rx", "ry", "rz"]
+        elif model == "P2D":
+            state_var_cols = ["rx", "ry", "mx", "my"]
+        elif model == "Sh":
+            state_var_cols = ["u", "x", "y", "z"]
+        elif model == "D":
+            state_var_cols = [f"r{i}" for i in range(dim)] + [f"p{i}" for i in range(dim)]
+        else:
+            raise Exception(f"Unknown model {model} for simple data conversion.")
+
+        # Assuming a single trajectory for now. If multiple trajectories are in the simple format,
+        # they would need a trajectory ID column, or processed separately.
+        # For now, we assume consecutive rows are consecutive timesteps of *one* trajectory.
+        for i in range(1, len(df_simple)):
+            current_row = df_simple.iloc[i]
+            previous_row = df_simple.iloc[i-1]
+
+            new_entry = {"time": current_row["time"]}
+            for col in state_var_cols:
+                new_entry[f"old_{col}"] = previous_row[col]
+                new_entry[col] = current_row[col]
+            converted_data.append(new_entry)
+
+        converted_df = pd.DataFrame(converted_data)
+        return converted_df
 
     def L_tensor_func(self, zn_tensor):
         L = self.A - self.A.t()
@@ -467,8 +511,7 @@ class Learner(object):
         :param zn_tensor: The `zn_tensor` parameter is a tensor representing the current state of the system. It is used to calculate the energy and Jacobian vectors for the system.
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the state of the system at time `t + dt`, where `t` is the current time and `dt` is the time step.
         :param mid_tensor: The `mid_tensor` parameter is not used in the `mov_loss_implicit` function. It is not necessary for the calculation and can be removed from the function signature.
-        :return: The function `mov_loss_implicit` returns the result of the expression `(zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1))`.
-        """
+        :return: The function `mov_loss_implicit` returns the result of the expression `(zn_tensor - zn2_tensor)/self.dt + 1.0/2.0*(torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1))`.\n        """
         En = self.energy(zn_tensor)
         En2 = self.energy(zn2_tensor)
 
@@ -586,7 +629,7 @@ class Learner(object):
                 self.train_errors.append([float(train_acc), 0.0])
             
             end_time_train = time.time()
-            print("Time taken for training: %.2fs" % (end_time_train - start_time_train))
+            print(f"Time taken for training: {end_time_train - start_time_train:.2f}s")
 
             start_time_val = time.time()
             # Run a validation loop at the end of each epoch.
@@ -626,13 +669,13 @@ class Learner(object):
                 val_acc_reg = self.val_metric_reg.compute()
                 self.val_metric_reg.reset()
                 self.validation_errors.append([float(val_acc_val), float(val_acc_reg)])
-                print("Validation error: value %.4f" % float(val_acc_val), float(val_acc_reg))
+                print(f"Validation error: value {float(val_acc_val):.4f} {float(val_acc_reg):.4f}")
             else: #implicit
                 self.validation_errors.append([float(val_acc_val), 0.0])
-                print("Validation error: value %.4f" % (float(val_acc_val)))
+                print(f"Validation error: value {float(val_acc_val):.4f}")
 
             end_time_val = time.time()
-            print("Time taken for validation: %.2fs" % (end_time_val - start_time_val))
+            print(f"Time taken for validation: {end_time_val - start_time_val:.2f}s")
             #print("Time taken: %.2fs" % (time.time() - start_time))
             scheduler.step()
             #print(optimizer.param_groups[0]['lr'])
@@ -712,8 +755,7 @@ class LearnerIMR(Learner):
         :param zn_tensor: The `zn_tensor` parameter represents the current state of the system at time `n`
         :param zn2_tensor: The `zn2_tensor` parameter is a tensor representing the state at time `t - dt`
         :param mid_tensor: The `mid_tensor` parameter represents the input tensor for which the energy and Jacobian vectors are calculated
-        :return: the result of the expression `(zn_tensor - zn2_tensor)/self.dt + torch.cross(Jz, E_z, dim=1)`.
-        """
+        :return: the result of the expression `(zn_tensor - zn2_tensor)/self.dt + torch.cross(Jz, E_z, dim=1)`.\n        """
         if self.dissipative:
             raise Exception("Not yet implemented")
         En = self.energy(mid_tensor)
@@ -803,3 +845,16 @@ if __name__ == "__main__":
                       dt = args.dt, name = args.name, jacobi_loss_mode=args.jacobi_loss_mode,
                       hutchinson_samples=args.hutchinson_samples)
     learner.learn(method = args.method, learning_rate = args.learning_rate, epochs = args.epochs, prefactor = args.prefactor)
+    parser.add_argument("--hutchinson_samples", default=DEFAULT_hutchinson_samples, type=int,
+                        help="Number of Hutchinson probe vectors for Jacobi loss")
+    #parser.parse_args(['-h'])
+
+    args = parser.parse_args([] if "__file__" not in globals() else None)
+
+    check_folder(args.name) #check whether the folders data and saved_models exist, or create them
+
+    learner = Learner(args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
+                      dt = args.dt, name = args.name, jacobi_loss_mode=args.jacobi_loss_mode,
+                      hutchinson_samples=args.hutchinson_samples)
+    learner.learn(method = args.method, learning_rate = args.learning_rate, epochs = args.epochs, prefactor = args.prefactor)
+

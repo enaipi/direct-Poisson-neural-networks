@@ -100,18 +100,21 @@ def run_simulation(sim_func, argss, use_multiprocessing):
 
 def generate_trajectories(args):
     """
-    The function `generate_trajectories` generates and saves trajectories based on the given arguments, either using a deterministic approach or simulating with learned models.
+    The function `generate_trajectories` generates and saves trajectories based on the given arguments, either using a deterministic approach or simulating with learned models, or loads external data.
     
     :param args: The `args` parameter is a dictionary or object that contains various arguments or parameters for the `generate_trajectories` function. These arguments control the behavior of the function and determine what kind of trajectories are generated or simulated
     """
-    if args.generate:
+    total_generalization_data_frame = None
+    if args.external_data:
+        print(f"Loading external dataset from: {args.external_data}")
+        total_generalization_data_frame = pd.read_csv(args.external_data, dtype=np.float32)
+        # Save the external data to the default dataset path so Learner can find it
+        save_simulation(total_generalization_data_frame, args.folder_name+"/"+DEFAULT_dataset)
+    elif args.generate:
         print("Generating dataset.")
         #Now we generage initial conditions (deterministic)
         np.random.seed(args.seed)
-
         initial_conditions = generate_initial_conditions(args, device=args.device)
-        # initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_generate.csv", device=args.device)
-        
         initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
         batched_inputs = [(args, batch) for batch in initial_condition_batches]
 
@@ -128,25 +131,18 @@ def generate_trajectories(args):
         #save to file
         save_simulation(total_data_frame, args.folder_name+"/"+DEFAULT_dataset)
         print("Generated trajectories saved to: ", args.folder_name+"/"+DEFAULT_dataset)
-
-    else: #simulating with the learned models
+        total_generalization_data_frame = total_data_frame # Use generated data as GT
+    else: #simulating with the learned models, first generate GT if not external data
         multiprocessing = args.multiprocessing
-
-        total_implicit_data_frame = None
-        total_soft_data_frame = None
-        total_without_data_frame = None
-        total_generalization_data_frame = None
-        np.random.seed(args.seed+100*args.sampling) #new seed, safely beyond the last used value
-
         print("-------------------------------")
         print("Simulating with learned models.")    
         print("-------------------------------")
 
         #GT
-        print("Generating GT.")
+        print("Generating GT for comparison.")
 
+        np.random.seed(args.seed+100*args.sampling) #new seed, safely beyond the last used value
         initial_conditions = generate_initial_conditions(args, device=args.device)
-        #initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_test.csv", device=args.device)
 
         initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
  
@@ -160,49 +156,101 @@ def generate_trajectories(args):
             dfs = [simulate_batch_normal(x) for x in batched_inputs]
 
         total_generalization_data_frame = pd.concat(dfs, ignore_index=True)
+        save_simulation(total_generalization_data_frame, args.folder_name+"/data/generalization.xyz")
+
+    # Now simulate with learned models for comparison if needed
+    total_implicit_data_frame = None
+    total_soft_data_frame = None
+    total_without_data_frame = None
+
+    # These simulations will use the initial conditions that were either generated or from the external data for GT
+    # The initial_conditions for these simulations should come from the *first* states of total_generalization_data_frame
+    if total_generalization_data_frame is not None:
+        # Extract initial conditions from the loaded/generated GT data
+        # This assumes the GT data has columns like 'old_mx', 'old_my', 'old_mz', 'old_rx', 'old_ry', 'old_rz'
+        # which represent the initial state of each trajectory.
+        # This part might need adjustment based on the exact format of the external data.
+        if args.model == "RB":
+            initial_m_cols = ["old_mx", "old_my", "old_mz"]
+            initial_r_cols = [] # RB doesn't use r
+        elif args.model in ["HT", "P3D", "K3D"]:
+            initial_m_cols = ["old_mx", "old_my", "old_mz"]
+            initial_r_cols = ["old_rx", "old_ry", "old_rz"]
+        elif args.model == "P2D":
+            initial_m_cols = ["old_mx", "old_my"]
+            initial_r_cols = ["old_rx", "old_ry"]
+        elif args.model == "Sh": # Assuming 'u', 'x', 'y', 'z' for Shivamoggi as per dataset.py
+            initial_m_cols = ["old_u"] # u is like momentum here
+            initial_r_cols = ["old_x", "old_y", "old_z"]
+        elif args.model == "D":
+            initial_r_cols = [f"old_r{i}" for i in range(args.dimensions)]
+            initial_p_cols = [f"old_p{i}" for i in range(args.dimensions)]
+            initial_m_cols = initial_p_cols
+        else:
+            raise Exception("Unknown model for extracting initial conditions from GT data.")
+
+        # Get the unique initial conditions (the first row of each trajectory)
+        # Assuming that the 'time' column starts from 0 for each unique trajectory.
+        # We need to get the initial conditions for *all* trajectories, not just for a single batch.
+        # A simpler approach might be to store the initial_conditions in the args object if it's generated,
+        # or load them separately if they are from external data.
+        # For now, let's assume `total_generalization_data_frame` has a 'time' column and we want rows where time is 0.
+        initial_states_df = total_generalization_data_frame[total_generalization_data_frame['time'] == 0]
+
+        if args.model == "RB":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols].values, dtype=torch.float32, device=args.device)
+            # Pad with zeros for r, if the simulate_batch expects 6 dimensions
+            initial_conditions_for_learned = torch.cat([initial_conditions_for_learned, torch.zeros(initial_conditions_for_learned.shape[0], 3, device=args.device)], dim=1)
+        elif args.model == "Sh":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+        elif args.model in ["HT", "P3D", "K3D", "P2D"]:
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+        elif args.model == "D":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+
+        initial_condition_batches_for_learned = split_into_batches(initial_conditions_for_learned, args.simulation_batch_size)
+        batched_inputs_for_learned = [(args, batch) for batch in initial_condition_batches_for_learned]
 
         if args.implicit:
             print("Simulating with learned implicit.")
             if args.multiprocessing:
                 ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_implicit, batched_inputs)
-            else:
-                dfs = [simulate_batch_implicit(x) for x in batched_inputs]
+                with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                    dfs = pool.map(simulate_batch_implicit, batched_inputs_for_learned)
+        else:
+            dfs = [simulate_batch_implicit(x) for x in batched_inputs_for_learned]
             total_implicit_data_frame = pd.concat(dfs, ignore_index=True)
+            save_simulation(total_implicit_data_frame, args.folder_name+"/data/learned_implicit.xyz")
 
         if args.soft:
             print("Simulating with learned soft.")
             if args.multiprocessing:
                 ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_soft, batched_inputs)
+                with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                    dfs = pool.map(simulate_batch_soft, batched_inputs_for_learned)
             else:
-                dfs = [simulate_batch_soft(x) for x in batched_inputs]
+                dfs = [simulate_batch_soft(x) for x in batched_inputs_for_learned]
             total_soft_data_frame = pd.concat(dfs, ignore_index=True)
+            save_simulation(total_soft_data_frame, args.folder_name+"/data/learned_soft.xyz")
 
         if args.without:
             print("Simulating with learned without.")
             if args.multiprocessing:
                 ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_without, batched_inputs)
+                with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                    dfs = pool.map(simulate_batch_without, batched_inputs_for_learned)
             else:
-                dfs = [simulate_batch_without(x) for x in batched_inputs]
+                dfs = [simulate_batch_without(x) for x in batched_inputs_for_learned]
             total_without_data_frame = pd.concat(dfs, ignore_index=True)
+            save_simulation(total_without_data_frame, args.folder_name+"/data/learned_without.xyz")
+    else:
+        print("No generalization data available to simulate with learned models.")
 
-        #    %if (args.points >= 10) and ((i % int(round(args.points/10))) == 0):
-        #        print((i+0.0)/args.points*100, "%")
-
-        #save to file
-        if args.implicit:
-            save_simulation(total_implicit_data_frame, args.folder_name+"/data/learned_implicit.xyz") 
-        if args.soft:
-            save_simulation(total_soft_data_frame, args.folder_name+"/data/learned_soft.xyz") 
-        if args.without:
-            save_simulation(total_without_data_frame, args.folder_name+"/data/learned_without.xyz") 
+    # Always save the generalization data (either generated or loaded external data)
+    # The GT data is already saved to DEFAULT_dataset path earlier if generated or external.
+    # We also save it to 'generalization.xyz' for consistency in output.
+    if total_generalization_data_frame is not None:
         save_simulation(total_generalization_data_frame, args.folder_name+"/data/generalization.xyz")
-        
 
 def add_plot(ax, x=None,y=None, name=""):
     """
@@ -223,9 +271,8 @@ def plot_training_errors(args):
     """
     The function `plot_training_errors` reads error data from CSV files and plots the training and validation errors for different scenarios.
     
-    :param args: The `args` parameter is an object that contains the following attributes:
-    """
-    print("***If Runtime tkinter errors are raised, it is because some matplotlib vs threads problems. Shouldn't be serious.***")
+    :param args: The `args` parameter is an object that contains the following attributes:\n    """
+    print("***If Runtime tkinter errors are raised, it is because some matplotlib vs threads problems. Shouldn\'t be serious.***")
 
     name = args.folder_name
     if args.soft:
@@ -327,7 +374,7 @@ def main():
     parser.add_argument("--normalise", default=False, action="store_true", help="Normalise energy matrix at the end")
     parser.add_argument("--generate", default=False, action="store_true", help="Generate new trajectories.")
     parser.add_argument("--verbose", default=False, action="store_true", help="Print a lot of useful output")
-    parser.add_argument("--no_show", default=False, action="store_true", help="Don't show the training errors.")
+    parser.add_argument("--no_show", default=False, action="store_true", help="Don\'t show the training errors.")
     parser.add_argument("--sampling", default=100, type=int, help="Approximate number of points to be sampled on the sphere.")
     parser.add_argument("--points", default=100, type=int, help="Number of points on the sphere for generalization.")
     parser.add_argument("--prefactor", default=1.0, type=float, help="Loss prefactor")
@@ -356,6 +403,8 @@ def main():
                         help="Jacobi loss evaluation: exact or Hutchinson estimator")
     parser.add_argument("--hutchinson_samples", default=DEFAULT_hutchinson_samples, type=int,
                         help="Number of Hutchinson probe vectors for Jacobi loss")
+    parser.add_argument("--external_data", default=None, type=str, help="Path to external experimental data CSV.")
+    parser.add_argument("--external_data_simple_format", action="store_true", help="Expect external data in a simple format (time, state_vars) instead of old/new pairs.")
 
     args = parser.parse_args([] if "__file__" not in globals() else None)
 
@@ -375,7 +424,7 @@ def main():
         raise Exception(f"Implicit solver not yet implemented for {args.model}.")
     
     if args.model == "K3D" and args.scheme != "IMR":
-        raise Exception("Don't use CN for Kepler.")
+        raise Exception("Don\'t use CN for Kepler.")
 
     if args.model in ("P2D", "Sh") and args.scheme != "IMR":
         raise Exception(f"Only use the IMR scheme for {args.model}.")
@@ -391,14 +440,25 @@ def main():
         args.no_data_to_gpu = False
         print("Using CPU")
 
-    if args.generate:
-        print("-------------------------------")
-        print("Generating trajectories.")    
-        print("-------------------------------")
-        generate_trajectories(args)
-        args.generate = False
+    # Handle data generation/loading
+    if args.generate and args.external_data:
+        raise Exception("Cannot use both --generate and --external_data. Choose one.")
+    if args.external_data_simple_format and not args.external_data:
+        raise Exception("Cannot use --external_data_simple_format without --external_data.")
+
+    import time
+    start_time = time.time()
+    # Call generate_trajectories once to either generate, load external, or simulate GT
+    print("-------------------------------")
+    print("Preparing trajectories (generating, loading, or simulating GT).")
+    print("-------------------------------")
+    generate_trajectories(args)
+    end_time = time.time()
+    print(f"generate_trajectories runtime: {end_time - start_time:.2f} seconds")
 
     dissipative = False if (args.zeta == 0) else True
+
+    # Initialize learners, passing external_data_path and external_data_simple_format
     if args.implicit:
         print("-------------------------------")
         print("Learning implicit Jacobi.")    
@@ -408,19 +468,22 @@ def main():
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                             dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                             dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                             simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                            external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
             
         learner.learn(method = "implicit", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     
@@ -433,22 +496,25 @@ def main():
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, 
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                D=args.dimensions,
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, 
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                D=args.dimensions,
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                             dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                             dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                             simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                            D=args.dimensions, 
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                            D=args.dimensions,
+                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                            external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         learner.learn(method = "soft", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor, jac_prefactor = args.jac_prefactor)
     if args.without:
         print("-------------------------------")
@@ -460,32 +526,27 @@ def main():
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
                                 D=args.dimensions, use_constant_L=args.const_L,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         elif args.scheme == "RK4":
             learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                                 dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                                 dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                                 simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
                                 D=args.dimensions, use_constant_L=args.const_L,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                                external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         else:
             learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
                             dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
                             dropout_rate = args.dropout_rate, quad_features=args.quad_features,
                             simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
                             D=args.dimensions, use_constant_L=args.const_L,
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
+                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples,
+                            external_data_path=args.external_data, external_data_simple_format=args.external_data_simple_format)
         learner.learn(method = "without", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
     if not args.no_show:
         plot_training_errors(args)
 
-    import time
-    start_time = time.time()
-    generate_trajectories(args)
-    end_time = time.time()
-    print(f"generate_trajectories runtime: {end_time - start_time:.2f} seconds")
-
-
 if __name__ == "__main__":
     main()
-    
