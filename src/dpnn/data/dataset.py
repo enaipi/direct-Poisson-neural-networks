@@ -1,11 +1,24 @@
 from torch.utils.data import Dataset
 import numpy as np
 import torch
+import json
+from pathlib import Path
+from typing import Optional
 
 class TrajectoryDataset(Dataset):
-    """TRAJECTORY DATASET"""
+    """
+    TRAJECTORY DATASET - Universal format supporting both legacy and standard formats.
+    
+    Can be initialized in two ways:
+    1. Legacy: TrajectoryDataset(dataframe, model="RB", ...)
+    2. Standard: TrajectoryDataset.from_standard_json(json_path, ...)
+    """
 
-    def __init__(self, dataframe, model = "RB", device=None, no_data_to_gpu=True, dim=10):
+    def __init__(self, dataframe=None, model = "RB", device=None, no_data_to_gpu=True, dim=10):
+        # Handle case where dataframe is None (for subclass initialization)
+        if dataframe is None:
+            return
+            
         if model == "RB":
             features = np.vstack((dataframe["old_mx"], dataframe["old_my"], dataframe["old_mz"])).transpose()
             targets  = np.vstack((dataframe["mx"], dataframe["my"], dataframe["mz"])).transpose()
@@ -48,3 +61,52 @@ class TrajectoryDataset(Dataset):
 
     def __getitem__(self, idx):
         return (self.features[idx], self.targets[idx], self.mid[idx])
+    
+    @classmethod
+    def from_standard_json(cls, json_path: str, device=None, no_data_to_gpu=True):
+        """
+        Load from standard JSON format.
+        
+        This enables learning on arbitrary systems without hardcoding dimensions.
+        
+        Args:
+            json_path: Path to standard format JSON file
+            device: PyTorch device
+            no_data_to_gpu: If False, move data to GPU
+        
+        Returns:
+            TrajectoryDataset instance
+        """
+        # Load JSON
+        with open(json_path, 'r') as f:
+            data = json.load(f)
+        
+        metadata = data["metadata"]
+        trajectories = data["trajectories"]
+        
+        # Stack all trajectories
+        z_list = [np.array(traj["z"], dtype=np.float32) for traj in trajectories]
+        z_all = np.vstack(z_list)  # (total_steps, dim)
+        
+        # Compute z_dot via finite differences
+        dt = metadata["dt"]
+        z_dot_all = (z_all[1:] - z_all[:-1]) / dt
+        
+        # Remove last state (no corresponding z_dot)
+        z_all = z_all[:-1]
+        
+        # Create instance
+        instance = cls(dataframe=None, device=device, no_data_to_gpu=no_data_to_gpu)
+        
+        # Set attributes
+        instance.features = torch.from_numpy(z_all)
+        instance.targets = torch.from_numpy(z_dot_all)
+        instance.mid = 0.5 * (instance.features + torch.from_numpy(z_all[1:]))
+        
+        # Move to GPU if requested
+        if not no_data_to_gpu and device is not None and device.type == 'cuda':
+            instance.features = instance.features.to(device)
+            instance.targets = instance.targets.to(device)
+            instance.mid = instance.mid.to(device)
+        
+        return instance
