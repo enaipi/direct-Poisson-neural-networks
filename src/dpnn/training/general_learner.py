@@ -1,36 +1,59 @@
 """
-GeneralSystemLearner: Universal learning pipeline for arbitrary dynamical systems.
+DEPRECATED: GeneralSystemLearner is deprecated. Use RobustLearner instead.
 
-This learner works with any system described by SystemSpec, eliminating the need
-to hardcode system-specific logic in the training pipeline.
+This module provides backward compatibility for the SystemSpec-based API.
+All functionality has been moved to RobustLearner in robust_learner.py.
+
+Migration path:
+    from dpnn.training.general_learner import GeneralSystemLearner
+    learner = GeneralSystemLearner(system_spec=spec)
+    
+Should become:
+    from dpnn.training.robust_learner import RobustLearner
+    learner = RobustLearner(system_spec=spec)
+
+Or use as thin wrapper (still works):
+    from dpnn.training.general_learner import GeneralSystemLearner
+    learner = GeneralSystemLearner(system_spec=spec)  # Still works, just warns
 """
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader
-from torch import einsum
-import numpy as np
-from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
-import time
+import warnings
+from typing import Optional
 
-from dpnn.models.energy_nn import EnergyNet
-from dpnn.models.tensor_nn import TensorNet, JacVectorNet
-from dpnn.system_spec import SystemSpec, get_system_spec
-from dpnn.data.standard_format import StandardTrajectoryDataset
+from dpnn.system_spec import SystemSpec
+from dpnn.training.robust_learner import RobustLearner
 
 
-class GeneralSystemLearner:
+def _deprecation_warning():
+    """Show deprecation warning."""
+    warnings.warn(
+        "GeneralSystemLearner is deprecated and will be removed in a future version. "
+        "Please use RobustLearner from dpnn.training.robust_learner instead.",
+        DeprecationWarning,
+        stacklevel=3
+    )
+
+
+__all__ = ['GeneralSystemLearner']
+
+
+class GeneralSystemLearner(RobustLearner):
     """
-    Universal learner for arbitrary dynamical systems.
+    Backward-compatible GeneralSystemLearner class.
     
-    Learns:
-    1. Energy network E(z) - outputs energy scalar
-    2. Optionally: Poisson structure tensor L(z) - outputs antisymmetric matrix
-    3. System follows: z_dot = L(z) @ grad_E(z)
+    This is a thin wrapper around RobustLearner for backward compatibility
+    with code using the SystemSpec-based API.
     
-    Works for any system without hardcoding dimensions or model types.
+    DEPRECATED: Use RobustLearner instead.
+    
+    Example:
+        # Old way (still works):
+        learner = GeneralSystemLearner(system_spec=spec, neurons=64, batch_size=32)
+        learner.learn(method="soft", epochs=10)
+        
+        # New way (recommended):
+        learner = RobustLearner(system_spec=spec, neurons=64, batch_size=32)
+        learner.learn(method="soft", epochs=10)  # Same API
     """
     
     def __init__(self,
@@ -42,364 +65,35 @@ class GeneralSystemLearner:
                  dropout_rate: float = 0.0,
                  quad_features: bool = False,
                  jacobi_loss_mode: str = "exact",
-                 hutchinson_samples: int = 3):
+                 hutchinson_samples: int = 3,
+                 **kwargs):
         """
-        Initialize learner for a system.
+        Initialize GeneralSystemLearner.
         
         Args:
             system_spec: SystemSpec describing the system
             batch_size: Training batch size
             neurons: Neurons per layer in networks
             layers: Number of layers
-            device: PyTorch device
+            device: PyTorch device ('cpu' or 'cuda')
             dropout_rate: Dropout rate in networks
             quad_features: Add quadratic features to energy net
-            jacobi_loss_mode: "exact" or "soft" or "implicit"
-            hutchinson_samples: Samples for stochastic Jacobian estimation
+            jacobi_loss_mode: Jacobi loss evaluation mode
+            hutchinson_samples: Samples for stochastic estimation
+            **kwargs: Additional arguments for RobustLearner
         """
-        self.system_spec = system_spec
-        self.dim = system_spec.dimension
-        self.device = device
-        self.batch_size = batch_size
-        self.jacobi_loss_mode = jacobi_loss_mode
-        self.hutchinson_samples = hutchinson_samples
+        _deprecation_warning()
         
-        print(f"Initializing GeneralSystemLearner for {system_spec.name} (dim={self.dim})")
-        
-        # Energy network - always needed
-        self.energy_net = EnergyNet(
-            self.dim, neurons, layers, batch_size,
+        # Pass SystemSpec-based configuration to RobustLearner
+        super().__init__(
+            system_spec=system_spec,
+            batch_size=batch_size,
+            neurons=neurons,
+            layers=layers,
+            device=device,
             dropout_rate=dropout_rate,
-            quad_features=quad_features
-        ).to(device)
-        
-        # Jacobian-vector network (for learning Poisson structure if needed)
-        self.jac_vec_net = JacVectorNet(
-            self.dim, neurons, layers, batch_size,
-            dropout_rate=dropout_rate
-        ).to(device)
-        
-        # Entropy network (optional, for dissipative systems)
-        self.entropy_net = EnergyNet(
-            self.dim, neurons, layers, batch_size,
-            dropout_rate=dropout_rate,
-            quad_features=quad_features
-        ).to(device)
-        
-        # Tensor network for learning L(z) if structure_tensor == "learned"
-        if system_spec.structure_tensor == "learned":
-            self.tensor_net = TensorNet(
-                self.dim, neurons, layers, batch_size,
-                dropout_rate=dropout_rate
-            ).to(device)
-        else:
-            self.tensor_net = None
-    
-    def get_poisson_structure(self, z: torch.Tensor) -> torch.Tensor:
-        """
-        Get Poisson structure tensor L(z).
-        
-        Args:
-            z: State tensor, shape (batch_size, dim)
-        
-        Returns:
-            L: Shape (batch_size, dim, dim), antisymmetric matrices
-        """
-        if self.system_spec.structure_tensor == "learned":
-            return self.tensor_net(z)
-        
-        elif self.system_spec.poisson_bracket_type == "canonical":
-            # Canonical symplectic structure: [[0, I], [-I, 0]]
-            batch_size = z.shape[0]
-            
-            if self.dim % 2 == 0:
-                # Even dimension: standard canonical structure
-                half_dim = self.dim // 2
-                Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
-                Z[:, :half_dim, half_dim:] = torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
-                Z[:, half_dim:, :half_dim] = -torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
-            else:
-                # Odd dimension: use skew-symmetric identity-like structure
-                # For high-dimensional systems like EEG, use a generic skew-symmetric structure
-                Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
-                # Create a skew-symmetric structure by pairing dimensions
-                for i in range(self.dim // 2):
-                    Z[:, 2*i, 2*i+1] = 1.0
-                    Z[:, 2*i+1, 2*i] = -1.0
-                # For the last dimension (if odd), create a small coupling
-                if self.dim > 2 * (self.dim // 2):
-                    Z[:, -1, 0] = 1.0
-                    Z[:, 0, -1] = -1.0
-            
-            return Z
-        
-        elif self.system_spec.poisson_bracket_type == "rigid_body":
-            # Rigid body: -L for cross-product, L[i,j,k] = -eps_{ijk} z_k
-            batch_size = z.shape[0]
-            Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
-            
-            if self.dim == 3:
-                # 3D angular momentum: skew-symmetric from cross product
-                Z[:, 0, 1] = -z[:, 2]
-                Z[:, 0, 2] = z[:, 1]
-                Z[:, 1, 0] = z[:, 2]
-                Z[:, 1, 2] = -z[:, 0]
-                Z[:, 2, 0] = -z[:, 1]
-                Z[:, 2, 1] = z[:, 0]
-                return -Z
-            else:
-                raise NotImplementedError(f"Rigid body structure for dim={self.dim}")
-        
-        else:
-            raise ValueError(f"Unknown poisson_bracket_type: {self.system_spec.poisson_bracket_type}")
-    
-    def compute_energy_gradient(self, z: torch.Tensor, create_graph: bool = False) -> torch.Tensor:
-        """
-        Compute energy gradient via autograd.
-        
-        Args:
-            z: State tensor, shape (batch_size, dim)
-            create_graph: Whether to create a computational graph (for training)
-        
-        Returns:
-            grad_E: Shape (batch_size, dim), dE/dz
-        """
-        # Ensure z requires gradients
-        z_in = z.clone().detach().requires_grad_(True)
-        E = self.energy_net(z_in)
-        
-        # Compute gradient using autograd
-        try:
-            grads = torch.autograd.grad(
-                outputs=E.sum(),
-                inputs=z_in,
-                create_graph=create_graph,
-                retain_graph=create_graph,
-                allow_unused=False
-            )[0]
-        except RuntimeError as e:
-            # Fallback: return zeros if autograd fails
-            print(f"Warning: Autograd failed during gradient computation: {e}")
-            grads = torch.zeros_like(z_in)
-        
-        return grads
-    
-    def compute_z_dot_pred(self, z: torch.Tensor, create_graph: bool = False) -> torch.Tensor:
-        """
-        Predict z_dot = L(z) @ grad_E(z).
-        
-        Args:
-            z: State tensor, shape (batch_size, dim)
-            create_graph: Whether to create computational graph for gradients
-        
-        Returns:
-            z_dot_pred: Shape (batch_size, dim)
-        """
-        z_req = z.clone().detach().requires_grad_(True)
-        grad_E = self.compute_energy_gradient(z_req, create_graph=create_graph)
-        L = self.get_poisson_structure(z)
-        
-        # z_dot = L @ grad_E, einsum is efficient for batch
-        z_dot_pred = einsum('bij,bj->bi', L, grad_E)
-        return z_dot_pred
-    
-    def loss_dynamics(self, z: torch.Tensor, z_dot_target: torch.Tensor, z_mid: torch.Tensor = None, create_graph: bool = False) -> torch.Tensor:
-        """
-        Dynamics loss: Implicit midpoint rule residual (matches old learner).
-        
-        If z_mid is provided, uses implicit midpoint rule:
-            loss = MSE(z_dot_target, 0.5*(z_dot(z(t)) + z_dot(z(t+1))))
-        
-        Otherwise, uses simple MSE fitting:
-            loss = MSE(z_dot_pred, z_dot_target)
-        
-        Args:
-            z: State at t, shape (batch_size, dim)
-            z_dot_target: Target velocity at t, shape (batch_size, dim)
-            z_mid: Midpoint state 0.5*(z(t) + z(t+1)), optional
-            create_graph: Whether to create computational graph for backprop
-        
-        Returns:
-            Loss scalar
-        """
-        # Always compute prediction at z(t)
-        z_dot_pred_t = self.compute_z_dot_pred(z, create_graph=create_graph)
-        
-        # If midpoint provided, also compute at z(t+1) using implicit midpoint rule
-        if z_mid is not None:
-            # Recover z(t+1) from midpoint: z_mid = 0.5*(z + z_next)
-            z_next = 2 * z_mid - z
-            z_dot_pred_next = self.compute_z_dot_pred(z_next, create_graph=create_graph)
-            
-            # Implicit midpoint rule: z_dot ≈ 0.5*(z_dot_t + z_dot_next)
-            z_dot_pred = 0.5 * (z_dot_pred_t + z_dot_pred_next)
-        else:
-            # Simple fitting without integration scheme
-            z_dot_pred = z_dot_pred_t
-        
-        return torch.nn.functional.mse_loss(z_dot_pred, z_dot_target)
-    
-    def loss_jacobi(self, z: torch.Tensor) -> torch.Tensor:
-        """
-        Jacobi identity loss (soft constraint on Poisson structure).
-        
-        For canonical structure, Jacobi is automatically satisfied.
-        For learned structure, we add a soft constraint.
-        
-        Returns:
-            Loss scalar (0 if structure is predefined)
-        """
-        if self.system_spec.structure_tensor != "learned":
-            return torch.tensor(0.0, device=self.device)
-        
-        # For learned structure, compute Jacobi identity constraint
-        # [L, L] = 0 constraint (soft)
-        # This is complex, so for now return 0
-        # TODO: Implement Jacobi identity constraint
-        return torch.tensor(0.0, device=self.device)
-    
-    def train_epoch(self,
-                   data_loader: DataLoader,
-                   optimizer: torch.optim.Optimizer,
-                   jacobi_weight: float = 0.0) -> float:
-        """
-        Train for one epoch.
-        
-        Args:
-            data_loader: DataLoader with (z, z_dot) batches
-            optimizer: PyTorch optimizer
-            jacobi_weight: Weight for Jacobi loss
-        
-        Returns:
-            Average loss for epoch
-        """
-        self.energy_net.train()
-        if self.tensor_net:
-            self.tensor_net.train()
-        
-        total_loss = 0.0
-        num_batches = 0
-        
-        for batch in data_loader:
-            z, z_dot_target, z_mid = batch
-            z = z.to(self.device)
-            z_dot_target = z_dot_target.to(self.device)
-            z_mid = z_mid.to(self.device)
-            
-            optimizer.zero_grad()
-            
-            # Main loss: dynamics with implicit midpoint rule (matching old learner)
-            loss_dyn = self.loss_dynamics(z, z_dot_target, z_mid=z_mid, create_graph=True)
-            
-            # Optional: Jacobi loss
-            loss_jac = self.loss_jacobi(z)
-            
-            # Total loss
-            loss = loss_dyn + jacobi_weight * loss_jac
-            
-            loss.backward()
-            optimizer.step()
-            
-            total_loss += loss.item()
-            num_batches += 1
-        
-        return total_loss / num_batches if num_batches > 0 else 0.0
-    
-    def train(self,
-             data_path: str,
-             epochs: int = 10,
-             learning_rate: float = 1e-4,
-             jacobi_weight: float = 0.0,
-             save_path: Optional[str] = None) -> Dict[str, Any]:
-        """
-        Full training loop.
-        
-        Args:
-            data_path: Path to standard format JSON dataset
-            epochs: Number of training epochs
-            learning_rate: Adam learning rate
-            jacobi_weight: Weight for Jacobi constraint loss
-            save_path: Optional path to save trained model
-        
-        Returns:
-            Training history dict
-        """
-        # Load data
-        print(f"Loading data from {data_path}")
-        dataset = StandardTrajectoryDataset(data_path, system_spec=self.system_spec, device=self.device)
-        data_loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
-        
-        # Optimizer
-        params = list(self.energy_net.parameters())
-        if self.tensor_net:
-            params += list(self.tensor_net.parameters())
-        optimizer = optim.Adam(params, lr=learning_rate)
-        
-        # Training loop
-        history = {
-            "epochs": [],
-            "losses": [],
-        }
-        
-        print(f"Training for {epochs} epochs...")
-        start_time = time.time()
-        
-        for epoch in range(epochs):
-            loss = self.train_epoch(data_loader, optimizer, jacobi_weight=jacobi_weight)
-            history["epochs"].append(epoch)
-            history["losses"].append(loss)
-            
-            if (epoch + 1) % max(1, epochs // 10) == 0:
-                print(f"Epoch {epoch+1}/{epochs}, Loss: {loss:.6f}")
-        
-        elapsed = time.time() - start_time
-        print(f"Training completed in {elapsed:.1f}s")
-        
-        # Save if requested
-        if save_path:
-            self.save(save_path)
-            print(f"Model saved to {save_path}")
-        
-        return history
-    
-    def save(self, path: str):
-        """Save trained model."""
-        checkpoint = {
-            "system_spec": self.system_spec.to_dict(),
-            "energy_net": self.energy_net.state_dict(),
-            "entropy_net": self.entropy_net.state_dict(),
-            "jac_vec_net": self.jac_vec_net.state_dict(),
-        }
-        if self.tensor_net:
-            checkpoint["tensor_net"] = self.tensor_net.state_dict()
-        
-        torch.save(checkpoint, path)
-    
-    def load(self, path: str):
-        """Load trained model."""
-        checkpoint = torch.load(path, map_location=self.device)
-        self.energy_net.load_state_dict(checkpoint["energy_net"])
-        self.entropy_net.load_state_dict(checkpoint["entropy_net"])
-        self.jac_vec_net.load_state_dict(checkpoint["jac_vec_net"])
-        
-        if self.tensor_net and "tensor_net" in checkpoint:
-            self.tensor_net.load_state_dict(checkpoint["tensor_net"])
-    
-    def predict(self, z: torch.Tensor) -> torch.Tensor:
-        """
-        Predict z_dot for given states.
-        
-        Args:
-            z: States, shape (batch_size, dim)
-        
-        Returns:
-            z_dot_pred: Shape (batch_size, dim)
-        """
-        self.energy_net.eval()
-        if self.tensor_net:
-            self.tensor_net.eval()
-        
-        with torch.no_grad():
-            z_dot = self.compute_z_dot_pred(z.to(self.device))
-        
-        return z_dot
+            quad_features=quad_features,
+            jacobi_loss_mode=jacobi_loss_mode,
+            hutchinson_samples=hutchinson_samples,
+            **kwargs
+        )
