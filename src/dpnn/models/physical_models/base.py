@@ -1,8 +1,9 @@
-#This file contains the base RigidBody class and model loading utilities
+#This file contains the generic GeneralSystem class and model loading utilities
 
 from scipy.optimize import fsolve
 from math import *
 import numpy as np
+from typing import Callable, Optional, Tuple
 
 import torch
 
@@ -69,151 +70,221 @@ def load_models(name = DEFAULT_folder_name, method = "without", mx = torch.zeros
     return energy_net.to(device), L_net, J_net, A
 
 
-class RigidBody(object):
-    """Base class for rigid body motion solvers."""
+class GeneralSystem(object):
+    """
+    Generic Poisson structure integrator for arbitrary dynamical systems.
     
-    def __init__(self, Ix, Iy, Iz, d2E, mx, my, mz, dt, alpha, T=100, verbose = False, device = "cpu", dtype=torch.float32):
-        self.Ix = Ix
-        self.Iy = Iy
-        self.Iz = Iz
-        self.d2E= d2E
-        self.dtype = dtype 
-
-        if Iz > 0 and Iy > 0 and Iz > 0:
-            self.Jx = 1/Iz - 1/Iy
-            self.Jy = 1/Ix - 1/Iz
-            self.Jz = 1/Iy - 1/Ix
-
-        self.device = device
-        self.mx = torch.as_tensor(mx, device=self.device, dtype=self.dtype)
-        self.my = torch.as_tensor(my, device=self.device, dtype=self.dtype)
-        self.mz = torch.as_tensor(mz, device=self.device, dtype=self.dtype)
-
-        self.mx0 = torch.as_tensor(mx, device=self.device, dtype=self.dtype)
-        self.my0 = torch.as_tensor(my, device=self.device, dtype=self.dtype)
-        self.mz0 = torch.as_tensor(mz, device=self.device, dtype=self.dtype)
-
+    Governs evolution via: z_dot = L(z) @ grad_E(z)
+    where z is an arbitrary state vector.
+    
+    This class decouples the mathematical structure (integration schemes) from physics
+    specifics (energy and Poisson matrix), enabling code reuse across all system types.
+    """
+    
+    def __init__(self, 
+                 z_init: torch.Tensor,
+                 energy_fn: Callable,
+                 poisson_fn: Callable,
+                 grad_energy_fn: Callable,
+                 dt: float,
+                 device: str = "cpu",
+                 dtype: torch.dtype = torch.float32,
+                 verbose: bool = False):
+        """
+        Initialize a general dynamical system.
+        
+        :param z_init: Initial state vector, shape (batch_size, dim) or (dim,)
+        :param energy_fn: Callable E(z) -> tensor(batch_size) or tensor(). 
+                         If z has shape (batch, dim), returns (batch,). 
+                         If z has shape (dim,), returns scalar.
+        :param poisson_fn: Callable L(z) -> tensor(batch_size, dim, dim) or tensor(dim, dim).
+                          Skew-symmetric Poisson bivector.
+        :param grad_energy_fn: Callable grad_E(z) -> tensor same shape as z.
+                              Energy gradient.
+        :param dt: Time step for integration
+        :param device: Device ("cpu" or "cuda")
+        :param dtype: Data type (torch.float32 or torch.float64)
+        :param verbose: Print debug info
+        """
+        # Ensure z_init has batch dimension
+        if z_init.dim() == 1:
+            z_init = z_init.unsqueeze(0)
+        
+        self.z = z_init.clone().to(device=device, dtype=dtype)
+        self.z0 = z_init.clone().to(device=device, dtype=dtype)
+        
+        self.energy_fn = energy_fn
+        self.poisson_fn = poisson_fn
+        self.grad_energy_fn = grad_energy_fn
+        
         self.dt = dt
-        self.tau = dt*alpha
-
-        self.hbar = 1.0545718E-34 #reduced Planck constant [SI]
-        self.rho = 8.92E+03 #for copper
-        self.myhbar = self.hbar * self.rho #due to rescaled mass
-        self.kB = 1.38064852E-23 #Boltzmann constant
-        self.umean = 4600 #mean sound speed in the low temperature solid (Copper) [SI]
-        self.Einconst = pi**2/10 * pow(15/(2* pi**2), 4.0/3) * self.hbar * self.umean * pow(self.kB, -4.0/3) #Internal energy prefactor, Characterisitic volume = 1
-        if verbose:
-            print("Internal energy prefactor = ", self.Einconst)
-
-        self.sin = self.ST(T) #internal entropy
-        if verbose:
-            print("Internal entropy set to Sin = ", self.sin, " at T=",T," K")
-
-        self.Ein_init = 1
-        self.Ein_init = self.Ein()
-        self.sin_init = self.sin
-        if verbose:
-            print("Initial total energy = ", self.Etot())
-
-        if verbose:
-            print("RB set up.")
-
-    def energy_x(self):
-        """The function calculates the energy of an object in the x-direction."""
-        return 0.5*self.mx*self.mx/self.Ix
-
-    def energy_y(self):
-        """The function calculates the energy of an object in the y-direction."""
-        return 0.5*self.my*self.my/self.Iy
-
-    def energy_z(self):
-        """The function calculates the energy of an object rotating around the z-axis."""
-        return 0.5*self.mz*self.mz/self.Iz
-
-    def energy(self):#returns kinetic energy
-        """The function calculates the kinetic energy of an object based on its mass and moments of inertia."""
-        return 0.5*(self.mx*self.mx/self.Ix+self.my*self.my/self.Iy+self.mz*self.mz/self.Iz)
-
-    def omega_x(self):
-        """The function calculates the angular velocity around the x-axis."""
-        return self.mx/self.Ix
-
-    def omega_y(self):
-        """The function calculates the omega_y value by dividing my by Iy."""
-        return self.my/self.Iy
-
-    def omega_z(self):
-        """The function calculates the angular velocity around the z-axis."""
-        return self.mz/self.Iz
-
-    def m2(self):#returns m^2
-        """The function calculates the square of the magnitude of a vector."""
-        return self.mx*self.mx+self.my*self.my+self.mz*self.mz
-
-    def mx2(self):#returns mx^2
-        """The function mx2 returns the value of mx squared."""
-        return self.mx*self.mx
-
-    def my2(self):#returns my^2
-        """The function `my2` returns the square of the value of `self.my`."""
-        return self.my*self.my
-
-    def mz2(self):#returns mz^2
-        """The function mz2 returns the square of the value of mz."""
-        return self.mz*self.mz
-
-    def m_magnitude(self):#returns |m|
-        """The function returns the magnitude of a vector."""
-        return sqrt(self.m2())
-
-    def Ein(self):#returns normalized internal energy
-        """The function returns the normalized internal energy."""
-        return self.Einconst*pow(self.sin,4.0/3)/self.Ein_init
-
-    def Ein_s(self): #returns normalized derivative of internal energy with respect to entropy (inverse temperature)
-        """The function returns the normalized derivative of internal energy with respect to entropy."""
-        return self.Einconst*4.0/3*pow(self.sin, 1.0/3) / self.Ein_init
-
-    def ST(self, T): #returns entropy of a Copper body with characteristic volume equal to one (Debye), [T] = K
-        """The function calculates the entropy of a Copper body with a characteristic volume equal to one (Debye) at a given temperature."""
-        return 2 * pi**2/15 * self.kB * (self.kB/self.hbar *T/self.umean)**3
-
-    def Etot(self):#returns normalized total energy
-        """The function `Etot` returns the sum of the energy and the input energy."""
-        return self.energy() + self.Ein()
-
-    def Sin(self): #returns normalized internal entorpy
-        """The intenral entropy function returns the normalized internal entropy."""
-        return self.sin/self.sin_init
-
-    def S_x(self):#kinetic entropy for rotation around x, beta = 1/4Iz
-        """The function calculates the kinetic entropy for rotation around the x-axis."""
-        m2 = self.m2()
-        return -m2/self.Ix - 0.5*0.25/self.Iz*(m2-self.mx0*self.mx0)**2
-
-    def S_z(self):#kinetic entropy for rotation around z
-        """The function calculates the kinetic entropy for rotation around the z-axis."""
-        m2 = self.m2()
-        return -m2/self.Iz - 0.5*0.25/self.Iz*(m2-self.mz0*self.mz0)**2
-
-    def Phi_x(self): #Returns the Phi potential for rotation around the x-axis
-        """The function Phi_x returns the sum of the energy and the S_x potential for rotation around the x-axis."""
-        return self.energy() + self.S_x()
-
-    def Phi_z(self):
-        """The function Phi_z returns the sum of the energy and the S_z value."""
-        return self.energy() + self.S_z()
+        self.device = device
+        self.dtype = dtype
+        self.verbose = verbose
         
-    def get_L(self, m):
-        """The function `get_L` returns a 3x3 matrix `L` (Poisson bivector) based on the input parameter `m`."""
-        zeros = torch.zeros_like(self.mx)
-        L = torch.stack([
-            torch.stack([zeros, self.mz, -self.my], dim=1),
-            torch.stack([-self.mz, zeros, self.mx], dim=1),
-            torch.stack([self.my, -self.mx, zeros], dim=1)
-        ], dim=1)
-        return - L
+        self.dim = self.z.shape[-1]  # Dimension of state space
+        self.batch_size = self.z.shape[0]  # Number of trajectories
         
-    def get_E(self, m):
-        """The function "get_E" returns the energy of an object."""
-        return self.energy()
+        if self.verbose:
+            print(f"GeneralSystem initialized: batch_size={self.batch_size}, dim={self.dim}")
+    
+    def get_E(self, z: torch.Tensor) -> torch.Tensor:
+        """Compute energy at state z."""
+        return self.energy_fn(z)
+    
+    def get_L(self, z: torch.Tensor) -> torch.Tensor:
+        """Compute Poisson bivector at state z. Returns (batch, dim, dim) tensor."""
+        L = self.poisson_fn(z)
+        # Ensure correct shape for batch operations
+        if L.dim() == 2:  # Single (dim, dim) matrix
+            L = L.unsqueeze(0).expand(z.shape[0], -1, -1)
+        return L
+    
+    def get_grad_E(self, z: torch.Tensor) -> torch.Tensor:
+        """Compute energy gradient at state z. Returns same shape as z."""
+        return self.grad_energy_fn(z)
+    
+    def get_zdot(self, z: torch.Tensor) -> torch.Tensor:
+        """
+        Compute z_dot = L(z) @ grad_E(z).
+        
+        :param z: State vector, shape (batch_size, dim)
+        :return: Time derivative, shape (batch_size, dim)
+        """
+        grad_E = self.get_grad_E(z)  # (batch_size, dim)
+        L = self.get_L(z)             # (batch_size, dim, dim)
+        
+        # Matrix-vector multiplication for each batch element
+        z_dot = torch.einsum('bij,bj->bi', L, grad_E)
+        return z_dot
+    
+    def m_new_explicit_euler(self) -> torch.Tensor:
+        """
+        One step of explicit Euler (forward Euler).
+        Simple but not structure-preserving.
+        
+        z_new = z_old + dt * z_dot(z_old)
+        """
+        z_dot = self.get_zdot(self.z)
+        self.z = self.z + self.dt * z_dot
+        return self.z
+    
+    def m_new_crank_nicolson(self, 
+                             solver_iterations: int = 200,
+                             tol: float = 1e-6) -> torch.Tensor:
+        """
+        One step of Crank-Nicolson (semi-implicit, symplectic).
+        
+        z_new = z_old + (dt/2) * (z_dot(z_old) + z_dot(z_new))
+        Solved via fixed-point iteration.
+        
+        :param solver_iterations: Max iterations for implicit solve
+        :param tol: Convergence tolerance (relative)
+        :return: New state z_new
+        """
+        z_old = self.z.clone()
+        z_new = z_old.clone()
+        
+        z_dot_old = self.get_zdot(z_old)
+        
+        for iteration in range(solver_iterations):
+            z_prev = z_new.clone()
+            z_dot_new = self.get_zdot(z_new)
+            
+            z_new = z_old + 0.5 * self.dt * (z_dot_old + z_dot_new)
+            
+            # Check convergence
+            diff = torch.norm(z_new - z_prev, dim=1)
+            denom = torch.norm(z_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+            
+            if torch.all(rel_error < tol):
+                break
+        
+        else:
+            # If loop completes without breaking, check which trajectories didn't converge
+            not_converged = (rel_error >= tol)
+            if not_converged.any():
+                if self.verbose:
+                    print(f"CN: {not_converged.sum().item()} trajectories did not converge (max iterations).")
+        
+        self.z = z_new
+        return z_new
+    
+    def m_new_implicit_midpoint(self, 
+                                solver_iterations: int = 200,
+                                tol: float = 1e-6) -> torch.Tensor:
+        """
+        One step of Implicit Midpoint Rule (IMR, fully symplectic).
+        
+        z_new = z_old + dt * z_dot((z_old + z_new) / 2)
+        Solved via fixed-point iteration.
+        
+        :param solver_iterations: Max iterations for implicit solve
+        :param tol: Convergence tolerance (relative)
+        :return: New state z_new
+        """
+        z_old = self.z.clone()
+        z_new = z_old.clone()
+        
+        for iteration in range(solver_iterations):
+            z_prev = z_new.clone()
+            z_mid = 0.5 * (z_old + z_new)
+            z_dot_mid = self.get_zdot(z_mid)
+            
+            z_new = z_old + self.dt * z_dot_mid
+            
+            # Check convergence
+            diff = torch.norm(z_new - z_prev, dim=1)
+            denom = torch.norm(z_prev, dim=1) + 1e-12
+            rel_error = diff / denom
+            
+            if torch.all(rel_error < tol):
+                break
+        
+        else:
+            not_converged = (rel_error >= tol)
+            if not_converged.any():
+                if self.verbose:
+                    print(f"IMR: {not_converged.sum().item()} trajectories did not converge (max iterations).")
+        
+        self.z = z_new
+        return z_new
+    
+    def m_new_rk4(self) -> torch.Tensor:
+        """
+        One step of 4th-order Runge-Kutta (explicit, not structure-preserving but accurate).
+        
+        :return: New state z_new
+        """
+        z_old = self.z.clone()
+        
+        k1 = self.get_zdot(z_old)
+        k2 = self.get_zdot(z_old + 0.5 * self.dt * k1)
+        k3 = self.get_zdot(z_old + 0.5 * self.dt * k2)
+        k4 = self.get_zdot(z_old + self.dt * k3)
+        
+        z_new = z_old + (self.dt / 6.0) * (k1 + 2*k2 + 2*k3 + k4)
+        
+        self.z = z_new
+        return z_new
+    
+    def m_new(self, method: str = "crank_nicolson", **kwargs) -> torch.Tensor:
+        """
+        Generic integrator step dispatcher.
+        
+        :param method: Integration method ("euler", "crank_nicolson", "implicit_midpoint", "rk4")
+        :param kwargs: Method-specific arguments
+        :return: New state
+        """
+        if method == "euler":
+            return self.m_new_explicit_euler()
+        elif method == "crank_nicolson" or method == "cn":
+            return self.m_new_crank_nicolson(**kwargs)
+        elif method == "implicit_midpoint" or method == "imr":
+            return self.m_new_implicit_midpoint(**kwargs)
+        elif method == "rk4":
+            return self.m_new_rk4()
+        else:
+            raise ValueError(f"Unknown integration method: {method}")
+

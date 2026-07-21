@@ -9,7 +9,8 @@ New code should prefer:
 """
 
 # Import and re-export all classes from the new physical_models package
-from dpnn.models.physical_models.base import load_models, RigidBody
+from dpnn.models.physical_models.base import load_models
+from dpnn.models.physical_models.rigid_body import RigidBody
 from dpnn.models.physical_models.rigid_body_integrators import (
     RBEhrenfest, RBESeReCN, RBIMR, RBRK4, RBESeReFE
 )

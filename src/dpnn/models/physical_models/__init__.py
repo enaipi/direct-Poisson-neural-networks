@@ -2,6 +2,10 @@
 
 from .base import (
     load_models,
+    GeneralSystem,
+)
+
+from .rigid_body import (
     RigidBody,
 )
 
@@ -46,7 +50,8 @@ from .shivamoggi_particlend import (
 )
 
 __all__ = [
-    # Base classes and utilities
+    # Generic infrastructure
+    "GeneralSystem",
     "load_models",
     "RigidBody",
     

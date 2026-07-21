@@ -5,7 +5,8 @@ import numpy as np
 import torch
 
 from dpnn.training import DEFAULT_folder_name
-from .base import RigidBody, load_models
+from .rigid_body import RigidBody
+from .base import load_models
 
 
 class HeavyTopCN(RigidBody): #Crank-Nicolson

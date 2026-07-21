@@ -4,7 +4,7 @@ from scipy.optimize import fsolve
 import numpy as np
 import torch
 
-from .base import RigidBody
+from .rigid_body import RigidBody
 
 
 class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a from https://doi.org/10.1016/j.physd.2019.06.006, τ=dt
