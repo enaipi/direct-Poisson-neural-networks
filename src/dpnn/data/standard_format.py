@@ -289,20 +289,22 @@ class StandardTrajectoryDataset:
         
         # Stack all trajectories and compute z_dot
         z_all_list = [traj.z for traj in trajectories]
-        z_all = np.vstack(z_all_list)  # (total_steps, dim)
+        z_all_full = np.vstack(z_all_list)  # (total_steps, dim)
         
         # Compute z_dot via finite differences
-        z_dot_all = (z_all[1:] - z_all[:-1]) / metadata.dt
+        z_dot_all = (z_all_full[1:] - z_all_full[:-1]) / metadata.dt
         
-        # Remove last state since it doesn't have corresponding z_dot
-        z_all = z_all[:-1]
+        # Remove last state and get corresponding next states
+        z_all = z_all_full[:-1]        # z(0), ..., z(N-1)
+        z_all_next = z_all_full[1:]   # z(1), ..., z(N)
         
         # Convert to tensors
         self.z = torch.from_numpy(z_all).float()
         self.z_dot = torch.from_numpy(z_dot_all).float()
         
-        # Compute midpoint (for compatibility with old TrajectoryDataset)
-        self.z_mid = 0.5 * (self.z + z_all[1:])
+        # Compute midpoint: z_mid = 0.5*(z(t) + z(t+1))
+        z_next_tensor = torch.from_numpy(z_all_next).float()
+        self.z_mid = 0.5 * (self.z + z_next_tensor)
         
         # Move to device if requested
         if not no_data_to_gpu and device != 'cpu':

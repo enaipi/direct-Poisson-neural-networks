@@ -93,15 +93,18 @@ class TrajectoryDataset(Dataset):
         z_dot_all = (z_all[1:] - z_all[:-1]) / dt
         
         # Remove last state (no corresponding z_dot)
-        z_all = z_all[:-1]
+        z_all_trimmed = z_all[:-1]
+        z_all_next = z_all[1:]  # z(t+1)
         
         # Create instance
         instance = cls(dataframe=None, device=device, no_data_to_gpu=no_data_to_gpu)
         
         # Set attributes
-        instance.features = torch.from_numpy(z_all)
+        instance.features = torch.from_numpy(z_all_trimmed)
         instance.targets = torch.from_numpy(z_dot_all)
-        instance.mid = 0.5 * (instance.features + torch.from_numpy(z_all[1:]))
+        
+        # Compute midpoint: z_mid = 0.5*(z(t) + z(t+1))
+        instance.mid = 0.5 * (z_all_trimmed + z_all_next)
         
         # Move to GPU if requested
         if not no_data_to_gpu and device is not None and device.type == 'cuda':

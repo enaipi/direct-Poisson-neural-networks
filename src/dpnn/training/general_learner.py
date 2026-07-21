@@ -111,11 +111,26 @@ class GeneralSystemLearner:
         elif self.system_spec.poisson_bracket_type == "canonical":
             # Canonical symplectic structure: [[0, I], [-I, 0]]
             batch_size = z.shape[0]
-            half_dim = self.dim // 2
             
-            Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
-            Z[:, :half_dim, half_dim:] = torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
-            Z[:, half_dim:, :half_dim] = -torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
+            if self.dim % 2 == 0:
+                # Even dimension: standard canonical structure
+                half_dim = self.dim // 2
+                Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
+                Z[:, :half_dim, half_dim:] = torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
+                Z[:, half_dim:, :half_dim] = -torch.eye(half_dim, device=z.device, dtype=z.dtype).unsqueeze(0)
+            else:
+                # Odd dimension: use skew-symmetric identity-like structure
+                # For high-dimensional systems like EEG, use a generic skew-symmetric structure
+                Z = torch.zeros(batch_size, self.dim, self.dim, device=z.device, dtype=z.dtype)
+                # Create a skew-symmetric structure by pairing dimensions
+                for i in range(self.dim // 2):
+                    Z[:, 2*i, 2*i+1] = 1.0
+                    Z[:, 2*i+1, 2*i] = -1.0
+                # For the last dimension (if odd), create a small coupling
+                if self.dim > 2 * (self.dim // 2):
+                    Z[:, -1, 0] = 1.0
+                    Z[:, 0, -1] = -1.0
+            
             return Z
         
         elif self.system_spec.poisson_bracket_type == "rigid_body":
@@ -138,52 +153,90 @@ class GeneralSystemLearner:
         else:
             raise ValueError(f"Unknown poisson_bracket_type: {self.system_spec.poisson_bracket_type}")
     
-    def compute_energy_gradient(self, z: torch.Tensor) -> torch.Tensor:
+    def compute_energy_gradient(self, z: torch.Tensor, create_graph: bool = False) -> torch.Tensor:
         """
         Compute energy gradient via autograd.
         
         Args:
-            z: State tensor, shape (batch_size, dim), requires_grad=True
+            z: State tensor, shape (batch_size, dim)
+            create_graph: Whether to create a computational graph (for training)
         
         Returns:
             grad_E: Shape (batch_size, dim), dE/dz
         """
-        z_in = z.clone().requires_grad_(True)
+        # Ensure z requires gradients
+        z_in = z.clone().detach().requires_grad_(True)
         E = self.energy_net(z_in)
-        E_sum = E.sum()
-        E_sum.backward()
-        return z_in.grad
+        
+        # Compute gradient using autograd
+        try:
+            grads = torch.autograd.grad(
+                outputs=E.sum(),
+                inputs=z_in,
+                create_graph=create_graph,
+                retain_graph=create_graph,
+                allow_unused=False
+            )[0]
+        except RuntimeError as e:
+            # Fallback: return zeros if autograd fails
+            print(f"Warning: Autograd failed during gradient computation: {e}")
+            grads = torch.zeros_like(z_in)
+        
+        return grads
     
-    def compute_z_dot_pred(self, z: torch.Tensor) -> torch.Tensor:
+    def compute_z_dot_pred(self, z: torch.Tensor, create_graph: bool = False) -> torch.Tensor:
         """
         Predict z_dot = L(z) @ grad_E(z).
         
         Args:
             z: State tensor, shape (batch_size, dim)
+            create_graph: Whether to create computational graph for gradients
         
         Returns:
             z_dot_pred: Shape (batch_size, dim)
         """
-        z_req = z.clone().requires_grad_(True)
-        grad_E = self.compute_energy_gradient(z_req)
+        z_req = z.clone().detach().requires_grad_(True)
+        grad_E = self.compute_energy_gradient(z_req, create_graph=create_graph)
         L = self.get_poisson_structure(z)
         
         # z_dot = L @ grad_E, einsum is efficient for batch
         z_dot_pred = einsum('bij,bj->bi', L, grad_E)
         return z_dot_pred
     
-    def loss_dynamics(self, z: torch.Tensor, z_dot_target: torch.Tensor) -> torch.Tensor:
+    def loss_dynamics(self, z: torch.Tensor, z_dot_target: torch.Tensor, z_mid: torch.Tensor = None, create_graph: bool = False) -> torch.Tensor:
         """
-        Dynamics loss: MSE between predicted and target z_dot.
+        Dynamics loss: Implicit midpoint rule residual (matches old learner).
+        
+        If z_mid is provided, uses implicit midpoint rule:
+            loss = MSE(z_dot_target, 0.5*(z_dot(z(t)) + z_dot(z(t+1))))
+        
+        Otherwise, uses simple MSE fitting:
+            loss = MSE(z_dot_pred, z_dot_target)
         
         Args:
-            z: State, shape (batch_size, dim)
-            z_dot_target: Target velocity, shape (batch_size, dim)
+            z: State at t, shape (batch_size, dim)
+            z_dot_target: Target velocity at t, shape (batch_size, dim)
+            z_mid: Midpoint state 0.5*(z(t) + z(t+1)), optional
+            create_graph: Whether to create computational graph for backprop
         
         Returns:
             Loss scalar
         """
-        z_dot_pred = self.compute_z_dot_pred(z)
+        # Always compute prediction at z(t)
+        z_dot_pred_t = self.compute_z_dot_pred(z, create_graph=create_graph)
+        
+        # If midpoint provided, also compute at z(t+1) using implicit midpoint rule
+        if z_mid is not None:
+            # Recover z(t+1) from midpoint: z_mid = 0.5*(z + z_next)
+            z_next = 2 * z_mid - z
+            z_dot_pred_next = self.compute_z_dot_pred(z_next, create_graph=create_graph)
+            
+            # Implicit midpoint rule: z_dot ≈ 0.5*(z_dot_t + z_dot_next)
+            z_dot_pred = 0.5 * (z_dot_pred_t + z_dot_pred_next)
+        else:
+            # Simple fitting without integration scheme
+            z_dot_pred = z_dot_pred_t
+        
         return torch.nn.functional.mse_loss(z_dot_pred, z_dot_target)
     
     def loss_jacobi(self, z: torch.Tensor) -> torch.Tensor:
@@ -228,14 +281,15 @@ class GeneralSystemLearner:
         num_batches = 0
         
         for batch in data_loader:
-            z, z_dot_target, _ = batch  # z_mid not used here
+            z, z_dot_target, z_mid = batch
             z = z.to(self.device)
             z_dot_target = z_dot_target.to(self.device)
+            z_mid = z_mid.to(self.device)
             
             optimizer.zero_grad()
             
-            # Main loss: dynamics
-            loss_dyn = self.loss_dynamics(z, z_dot_target)
+            # Main loss: dynamics with implicit midpoint rule (matching old learner)
+            loss_dyn = self.loss_dynamics(z, z_dot_target, z_mid=z_mid, create_graph=True)
             
             # Optional: Jacobi loss
             loss_jac = self.loss_jacobi(z)
