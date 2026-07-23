@@ -77,7 +77,8 @@ class RobustLearner:
                  D: int = 10,
                  no_data_to_gpu: bool = True,
                  external_data_path: Optional[str] = None,
-                 external_data_simple_format: bool = False):
+                 external_data_simple_format: bool = False,
+                 verbose: bool = False):
         """
         Initialize RobustLearner.
         
@@ -135,6 +136,7 @@ class RobustLearner:
         self.use_constant_L = use_constant_L
         self.no_data_to_gpu = no_data_to_gpu
         self.D = D
+        self.verbose = verbose
         
         # Loss configuration
         self.jacobi_loss_mode = jacobi_loss_mode
@@ -169,11 +171,11 @@ class RobustLearner:
             # Legacy: load from name/data/dataset.xyz
             self._load_legacy_data()
         
-        # Metrics
-        self.train_metric = torchmetrics.MeanSquaredError().to(self.device)
-        self.val_metric = torchmetrics.MeanSquaredError().to(self.device)
-        self.train_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
-        self.val_metric_reg = torchmetrics.MeanSquaredError().to(self.device)
+        # Metrics - accumulate losses directly
+        self.train_loss_accum = []
+        self.train_loss_reg_accum = []
+        self.val_loss_accum = []
+        self.val_loss_reg_accum = []
         
         self.loss_fn = torch.nn.MSELoss()
         self.train_errors = []
@@ -438,8 +440,7 @@ class RobustLearner:
         
         residual = (z_n - z_n2) / self.dt + 0.5 * (term1 + term2)
         
-        mov_value = self.loss_fn(torch.zeros_like(residual), prefactor * residual)
-        return mov_value
+        return ((residual ** 2).mean()) * prefactor
     
     def _loss_rk4(self, z_n: torch.Tensor, z_n2: torch.Tensor,
                   z_mid: torch.Tensor, prefactor: float) -> torch.Tensor:
@@ -456,8 +457,7 @@ class RobustLearner:
         z_n_pred = z_n + (k1 + 2 * k2 + 2 * k3 + k4) / 6
         residual = (z_n_pred - z_n2) / self.dt
         
-        mov_value = self.loss_fn(torch.zeros_like(residual), prefactor * residual)
-        return mov_value
+        return ((residual ** 2).mean()) * prefactor
     
     # ========================================================================
     # SECTION 5: JACOBI LOSS (7 variants)
@@ -700,11 +700,24 @@ class RobustLearner:
         if method not in ["without", "soft", "implicit"]:
             raise ValueError(f"Unknown method '{method}'")
         
-        print("Learning from folder " + self.name)
-        print("Method = " + method)
-        print("Epochs = " + str(epochs))
-        print("Integration scheme = " + self.integration_scheme)
-        print("Jacobi loss mode = " + self.jacobi_loss_mode)
+        # Compute dt if not provided (default is 0)
+        if self.dt <= 0 or self.dt is None:
+            # Try to compute from data
+            if self.df is not None and 'dt' in self.df.columns:
+                self.dt = float(self.df['dt'].iloc[0])
+            else:
+                # Default to 0.01 if we can't compute it
+                self.dt = 0.01
+                if self.verbose:
+                    print(f"Warning: dt not provided, defaulting to {self.dt}")
+        
+        if self.verbose:
+            print(f"Using dt = {self.dt}")
+            print("Learning from folder " + self.name)
+            print("Method = " + method)
+            print("Epochs = " + str(epochs))
+            print("Integration scheme = " + self.integration_scheme)
+            print("Jacobi loss mode = " + self.jacobi_loss_mode)
         
         # Setup optimizer
         if method in ["without", "soft"]:
@@ -730,16 +743,26 @@ class RobustLearner:
         
         # Training loop
         for epoch in range(epochs):
-            print(f"\nStart of epoch {epoch}")
+            if self.verbose:
+                print(f"\n{'='*70}")
+                print(f">>> EPOCH {epoch}/{epochs-1} STARTED")
+                print(f"{'='*70}")
             start_time_train = time.time()
             
             # Training
+            if self.verbose:
+                print(f">>> Training loop: method={method}, num_batches={len(self.train_loader)}")
             for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.train_loader):
+                if step == 0 and self.verbose:
+                    print(f"    [Train] First batch: shape={zn_tensor.shape}")
                 
                 if not self.no_data_to_gpu:
                     zn_tensor = zn_tensor.to(self.device)
                     zn2_tensor = zn2_tensor.to(self.device)
                     mid_tensor = mid_tensor.to(self.device)
+                
+                if step == 0 and epoch == 0:
+                    print(f"DEBUG: zn_tensor[0]={zn_tensor[0]}, zn2_tensor[0]={zn2_tensor[0]}")
                 
                 if self.noise_sigma > 0.0:
                     zn_tensor = zn_tensor + self.noise_sigma * torch.randn_like(zn_tensor)
@@ -758,18 +781,16 @@ class RobustLearner:
                     else:
                         mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
                     loss = mov_loss
-                    self.train_metric(torch.zeros_like(mov_loss), prefactor * mov_loss)
+                    self.train_loss_accum.append(float(mov_loss.detach().cpu()))
                 
                 elif method == "soft":
                     mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
                     jacobi_loss = self.jacobi_loss(zn_tensor)
                     
-                    mov_value = self.loss_fn(torch.zeros_like(mov_loss), prefactor * mov_loss)
-                    reg_value = self.loss_fn(torch.zeros_like(jacobi_loss), jac_prefactor * jacobi_loss)
-                    
-                    loss = mov_value + reg_value
-                    self.train_metric(torch.zeros_like(mov_value), mov_value)
-                    self.train_metric_reg(torch.zeros_like(reg_value), reg_value)
+                    # mov_loss and jacobi_loss are already computed losses, use directly
+                    loss = mov_loss + jac_prefactor * jacobi_loss
+                    self.train_loss_accum.append(float(mov_loss.detach().cpu()))
+                    self.train_loss_reg_accum.append(float((jac_prefactor * jacobi_loss).detach().cpu()))
                 
                 elif method == "implicit":
                     En = self.energy(zn_tensor)
@@ -781,87 +802,201 @@ class RobustLearner:
                     Jz, _ = self.jac_vec(zn_tensor)
                     Jz2, _ = self.jac_vec(zn2_tensor)
                     
-                    mov_loss = (zn_tensor - zn2_tensor) / self.dt + 0.5 * (
-                        torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1)
-                    )
-                    loss = self.loss_fn(torch.zeros_like(mov_loss), prefactor * mov_loss)
-                    self.train_metric(torch.zeros_like(loss), loss)
+                    z_diff = (zn_tensor - zn2_tensor) / self.dt
+                    jac_term = 0.5 * (torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1))
+                    residual = z_diff + jac_term
+                    
+                    # Compute MSE loss of the residual
+                    loss = (residual ** 2).mean() * prefactor
+                    loss_val = float(loss.detach().cpu())
+                    if step == 0 and epoch == 0:
+                        z_raw_diff = (zn_tensor - zn2_tensor)
+                        print(f"DEBUG: dt={self.dt}, z_raw_diff.max={z_raw_diff.max():.8f}, z_n.shape={zn_tensor.shape}")
+                        print(f"DEBUG implicit: z_diff.max={z_diff.max():.8f}, jac_term.max={jac_term.max():.8f}")
+                        print(f"  residual.mean()={residual.mean():.8f}, (residual**2).mean()={((residual**2).mean()):.8e}")
+                    self.train_loss_accum.append(loss_val)
+                
+                # Check for NaN before backward pass
+                if torch.isnan(loss):
+                    print(f"ERROR: Loss is NaN at epoch {epoch}, step {step}")
+                    print(f"  residual contains NaN: {torch.isnan(residual).any() if 'residual' in locals() else 'N/A'}")
+                    print(f"  E_z contains NaN: {torch.isnan(E_z).any() if 'E_z' in locals() else 'N/A'}")
+                    print(f"  dt = {self.dt}")
+                    raise ValueError("Loss became NaN")
                 
                 loss.backward()
                 optimizer.step()
             
-            # Epoch metrics
-            train_acc = self.train_metric.compute()
-            self.train_metric.reset()
+            if self.verbose:
+                print(f">>> Training loop completed, clearing cache...")
+            # Clear GPU cache at end of epoch
+            if self.device.type == 'cuda':
+                torch.cuda.empty_cache()
+            
+            # Epoch metrics - compute mean of accumulated losses
+            if self.verbose:
+                print(f">>> Computing training metrics...")
+            train_acc = np.mean(self.train_loss_accum) if self.train_loss_accum else 0.0
+            if epoch == 0:
+                print(f"DEBUG: train_loss_accum has {len(self.train_loss_accum)} items, first few: {self.train_loss_accum[:3] if len(self.train_loss_accum) >= 3 else self.train_loss_accum}")
+                print(f"DEBUG: train_acc (mean) = {train_acc}")
+            self.train_loss_accum = []  # Reset accumulator
             
             if method == "soft":
-                train_acc_reg = self.train_metric_reg.compute()
-                self.train_metric_reg.reset()
-                print(f"Training err over epoch: {float(train_acc):.4f} reg {float(train_acc_reg):.4f}")
+                train_acc_reg = np.mean(self.train_loss_reg_accum) if self.train_loss_reg_accum else 0.0
+                self.train_loss_reg_accum = []  # Reset accumulator
+                if self.verbose:
+                    print(f"Training err over epoch: {float(train_acc):.4f} reg {float(train_acc_reg):.4f}")
                 self.train_errors.append([float(train_acc), float(train_acc_reg)])
+                train_loss_str = f"{float(train_acc):.4f} (reg: {float(train_acc_reg):.4f})"
             else:
-                print(f"Training err over epoch: {float(train_acc):.4f}")
+                if self.verbose:
+                    print(f"Training err over epoch: {float(train_acc):.4f}")
                 self.train_errors.append([float(train_acc), 0.0])
+                train_loss_str = f"{float(train_acc):.4f}"
             
             end_time_train = time.time()
-            print(f"Time taken for training: {end_time_train - start_time_train:.2f}s")
+            if self.verbose:
+                print(f"Time taken for training: {end_time_train - start_time_train:.2f}s")
             
             # Validation
             start_time_val = time.time()
-            jacobi_loss = None
+            has_jacobi = False
+            if self.verbose:
+                print(f"\n>>> STARTING VALIDATION (method={method})")
             
-            for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
-                
-                if not self.no_data_to_gpu:
-                    zn_tensor = zn_tensor.to(self.device)
-                    zn2_tensor = zn2_tensor.to(self.device)
-                    mid_tensor = mid_tensor.to(self.device)
-                
-                zn_tensor.requires_grad = True
-                zn2_tensor.requires_grad = True
-                mid_tensor.requires_grad = True
-                
-                if method == "without":
-                    if self.use_constant_L:
-                        mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
-                    else:
-                        mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
-                        jacobi_loss = self.jacobi_loss(zn_tensor)
-                elif method == "implicit":
+            if method == "implicit":
+                # Implicit method needs gradients for E_z computation, but we don't backprop
+                if self.verbose:
+                    print(">>> IMPLICIT validation loop started")
+                for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
+                    if self.verbose:
+                        print(f"    [Implicit] Step {step}: batch shape = {zn_tensor.shape}")
+                    
+                    if not self.no_data_to_gpu:
+                        zn_tensor = zn_tensor.to(self.device)
+                        zn2_tensor = zn2_tensor.to(self.device)
+                        mid_tensor = mid_tensor.to(self.device)
+                    
+                    # Compute gradients for E, but don't track for network parameters
+                    if self.verbose:
+                        print(f"    [Implicit] Computing E with no_grad...")
+                    with torch.no_grad():
+                        En = self.energy(zn_tensor)
+                        En2 = self.energy(zn2_tensor)
+                    
+                    # Need to enable gradients for E computation w.r.t. z, but not create graph for network params
+                    if self.verbose:
+                        print(f"    [Implicit] Enabling requires_grad for z tensors...")
+                    zn_tensor.requires_grad_(True)
+                    zn2_tensor.requires_grad_(True)
+                    
+                    if self.verbose:
+                        print(f"    [Implicit] Computing E with grad enabled...")
                     En = self.energy(zn_tensor)
                     En2 = self.energy(zn2_tensor)
-                    E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=True)[0]
-                    E_z2 = torch.autograd.grad(En2.sum(), zn2_tensor, only_inputs=True, create_graph=True)[0]
+                    if self.verbose:
+                        print(f"    [Implicit] Computing grad(E, z)...")
+                    E_z = torch.autograd.grad(En.sum(), zn_tensor, only_inputs=True, create_graph=False)[0]
+                    E_z2 = torch.autograd.grad(En2.sum(), zn2_tensor, only_inputs=True, create_graph=False)[0]
+                    if self.verbose:
+                        print(f"    [Implicit] Grad computed, computing Jz...")
+                    
+                    # jac_vec needs gradients enabled to compute its internal gradients
                     Jz, _ = self.jac_vec(zn_tensor)
                     Jz2, _ = self.jac_vec(zn2_tensor)
-                    mov_loss = (zn_tensor - zn2_tensor) / self.dt + 0.5 * (
-                        torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1)
-                    )
-                elif method == "soft":
+                    if self.verbose:
+                        print(f"    [Implicit] Computing residual...")
+                    
+                    with torch.no_grad():
+                        residual = (zn_tensor - zn2_tensor) / self.dt + 0.5 * (
+                            torch.cross(Jz, E_z, dim=1) + torch.cross(Jz2, E_z2, dim=1)
+                        )
+                        loss = (residual ** 2).mean() * prefactor
+                        self.val_loss_accum.append(float(loss.detach().cpu()))
+                    if self.verbose:
+                        print(f"    [Implicit] Step {step} completed")
+                if self.verbose:
+                    print(">>> IMPLICIT validation loop completed")
+            elif method == "soft":
+                # Soft method needs gradients for jacobi_loss computation
+                if self.verbose:
+                    print(f">>> SOFT validation loop started")
+                for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
+                    if self.verbose:
+                        print(f"    [soft] Step {step}: batch shape = {zn_tensor.shape}")
+                    
+                    if not self.no_data_to_gpu:
+                        zn_tensor = zn_tensor.to(self.device)
+                        zn2_tensor = zn2_tensor.to(self.device)
+                        mid_tensor = mid_tensor.to(self.device)
+                    
+                    # Enable gradients for soft method (loss_dynamics and jacobi_loss need gradients)
+                    zn_tensor.requires_grad_(True)
+                    zn2_tensor.requires_grad_(True)
+                    mid_tensor.requires_grad_(True)
+                    
                     mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
                     jacobi_loss = self.jacobi_loss(zn_tensor)
-                
-                mov_value = mov_loss.pow(2).mean() * (prefactor ** 2)
-                self.val_metric(torch.zeros_like(mov_value), mov_value)
-                
-                if jacobi_loss is not None:
-                    reg_value = self.loss_fn(torch.zeros_like(jacobi_loss), jac_prefactor * jacobi_loss)
-                    self.val_metric_reg(torch.zeros_like(reg_value), reg_value)
+                    self.val_loss_accum.append(float(mov_loss.detach().cpu()))
+                    self.val_loss_reg_accum.append(float((jac_prefactor * jacobi_loss).detach().cpu()))
+                    has_jacobi = True
+                    if self.verbose:
+                        print(f"    [soft] Step {step} completed")
+                if self.verbose:
+                    print(f">>> SOFT validation loop completed")
+            else:  # without method
+                # Without method: loss_dynamics needs gradients internally
+                if self.verbose:
+                    print(f">>> {method.upper()} validation loop started")
+                for step, (zn_tensor, zn2_tensor, mid_tensor) in enumerate(self.valid_loader):
+                    if self.verbose:
+                        print(f"    [{method}] Step {step}: batch shape = {zn_tensor.shape}")
+                    
+                    if not self.no_data_to_gpu:
+                        zn_tensor = zn_tensor.to(self.device)
+                        zn2_tensor = zn2_tensor.to(self.device)
+                        mid_tensor = mid_tensor.to(self.device)
+                    
+                    # Enable gradients so loss_dynamics can compute gradients internally
+                    zn_tensor.requires_grad_(True)
+                    zn2_tensor.requires_grad_(True)
+                    mid_tensor.requires_grad_(True)
+                    
+                    mov_loss = self.loss_dynamics(zn_tensor, zn2_tensor, mid_tensor, prefactor)
+                    self.val_loss_accum.append(float(mov_loss.detach().cpu()))
+                    if self.verbose:
+                        print(f"    [{method}] Step {step} completed")
+                if self.verbose:
+                    print(f">>> {method.upper()} validation loop completed")
             
-            val_acc_val = self.val_metric.compute()
-            self.val_metric.reset()
+            # Compute mean of accumulated validation losses
+            val_acc_val = np.mean(self.val_loss_accum) if self.val_loss_accum else 0.0
+            if epoch == 0:
+                print(f"DEBUG: val_loss_accum has {len(self.val_loss_accum)} items, first few: {self.val_loss_accum[:3] if len(self.val_loss_accum) >= 3 else self.val_loss_accum}")
+                print(f"DEBUG: val_acc_val (mean) = {val_acc_val}")
+            self.val_loss_accum = []  # Reset accumulator
             
-            if jacobi_loss is not None:
-                val_acc_reg = self.val_metric_reg.compute()
-                self.val_metric_reg.reset()
+            if has_jacobi:
+                val_acc_reg = np.mean(self.val_loss_reg_accum) if self.val_loss_reg_accum else 0.0
+                self.val_loss_reg_accum = []  # Reset accumulator
                 self.validation_errors.append([float(val_acc_val), float(val_acc_reg)])
-                print(f"Validation error: value {float(val_acc_val):.4f} reg {float(val_acc_reg):.4f}")
+                val_loss_str = f"{float(val_acc_val):.4f} (reg: {float(val_acc_reg):.4f})"
+                if self.verbose:
+                    print(f"Validation error: value {float(val_acc_val):.4f} reg {float(val_acc_reg):.4f}")
             else:
                 self.validation_errors.append([float(val_acc_val), 0.0])
-                print(f"Validation error: value {float(val_acc_val):.4f}")
+                val_loss_str = f"{float(val_acc_val):.4f}"
+                if self.verbose:
+                    print(f"Validation error: value {float(val_acc_val):.4f}")
             
             end_time_val = time.time()
-            print(f"Time taken for validation: {end_time_val - start_time_val:.2f}s")
+            if self.verbose:
+                print(f"Time taken for validation: {end_time_val - start_time_val:.2f}s")
+                print(f">>> EPOCH {epoch} COMPLETE\n")
+            else:
+                # Always print epoch progress even without verbose
+                print(f"Epoch {epoch:2d}/{epochs-1}: train={train_loss_str}, val={val_loss_str}")
             
             scheduler.step()
         
