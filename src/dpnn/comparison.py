@@ -32,6 +32,7 @@ import pandas as pd
 import torch
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
+import math
 
 from dpnn.simulation import simulate_batch, save_simulation
 from dpnn.training import (
