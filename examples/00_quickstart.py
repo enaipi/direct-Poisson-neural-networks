@@ -5,9 +5,10 @@ This is a minimal, practical guide to:
 1. Load your time series data
 2. Train a learner
 3. Extract the learned L(z) and H(z)
+4. Analyze learning quality with HamiltonianSystemAnalyzer
 
 Run this file as:
-    python recover_L_H.py
+    python 00_quickstart.py
 """
 
 import torch
@@ -290,7 +291,129 @@ def extract_learned_functions(learner, dim):
 
 
 # ============================================================================
-# STEP 5: COMPARE WITH GROUND TRUTH (if available)
+# STEP 5: ANALYZE LEARNED MODEL QUALITY
+# ============================================================================
+
+def analyze_learned_model(learner, z_timeseries, dim, dt):
+    """
+    Use HamiltonianSystemAnalyzer to measure learning quality.
+    
+    Computes:
+    - Trajectory discrepancy (learned vs ground truth)
+    - Jacobi identity error (Poisson structure validation)
+    - Energy conservation
+    - Per-component error breakdown
+    """
+    from dpnn.postprocessing import HamiltonianSystemAnalyzer
+    
+    print("\n" + "="*70)
+    print("STEP 5: ANALYZE LEARNED MODEL QUALITY")
+    print("="*70)
+    
+    # Create analyzer
+    analyzer = HamiltonianSystemAnalyzer(
+        dimension=dim,
+        system_name="QuickstartExample"
+    )
+    
+    # -----------------------------------------------------------------------
+    # Generate predictions with learned model
+    # -----------------------------------------------------------------------
+    print("\nGenerating predictions with learned model...")
+    
+    z_pred = [z_timeseries[0]]  # Start with first state
+    
+    learner.energy.eval()
+    learner.L_tensor.eval()
+    
+    with torch.no_grad():
+        z_current = torch.tensor(z_timeseries[0], dtype=torch.float32)
+        
+        for step in range(1, len(z_timeseries)):
+            # Compute ∇H
+            z_current = z_current.clone().detach().requires_grad_(True)
+            H = learner.energy(z_current.unsqueeze(0))
+            H.backward()
+            grad_H = z_current.grad.clone()
+            
+            # Get L(z)
+            with torch.no_grad():
+                L_z = learner.forward_L_tensor(z_current.unsqueeze(0))[0]
+                z_dot = L_z @ grad_H
+                z_next = z_current.detach() + dt * z_dot
+                z_pred.append(z_next.numpy())
+                z_current = z_next
+    
+    z_pred = np.array(z_pred)
+    print(f"  Generated {len(z_pred)} predictions")
+    
+    # -----------------------------------------------------------------------
+    # Trajectory Discrepancy Analysis
+    # -----------------------------------------------------------------------
+    print("\nAnalyzing trajectory discrepancy...")
+    
+    traj_results = analyzer.compute_trajectory_discrepancy(
+        z_pred[np.newaxis, :, :],  # Wrap as (1, num_steps, dim)
+        z_timeseries[np.newaxis, :, :],
+        metric="rmse"
+    )
+    
+    analyzer.results["trajectory_discrepancy"] = traj_results
+    
+    print(f"  Mean RMSE:   {traj_results['mean_error']:.6e}")
+    print(f"  Max RMSE:    {traj_results['max_error']:.6e}")
+    print(f"  Median RMSE: {traj_results['median_error']:.6e}")
+    
+    # -----------------------------------------------------------------------
+    # Jacobi Identity Analysis (Poisson Structure)
+    # -----------------------------------------------------------------------
+    print("\nAnalyzing Poisson structure (Jacobi identity)...")
+    
+    # Sample L matrices at different states
+    L_samples = []
+    num_samples = min(50, len(z_timeseries))
+    sample_indices = np.linspace(0, len(z_timeseries)-1, num_samples, dtype=int)
+    
+    with torch.no_grad():
+        for idx in sample_indices:
+            z_sample = torch.tensor(z_timeseries[idx], dtype=torch.float32)
+            L_sample = learner.forward_L_tensor(z_sample.unsqueeze(0))[0].numpy()
+            L_samples.append(L_sample)
+    
+    L_samples = np.array(L_samples)
+    
+    jacobi_results = analyzer.compute_jacobi_error(L_samples, method="spectral")
+    analyzer.results["jacobi_error"] = jacobi_results
+    
+    print(f"  Antisymmetry error:  {jacobi_results['mean_antisymmetry_error']:.6e}")
+    print(f"    Max antisymmetry:  {jacobi_results['max_antisymmetry_error']:.6e}")
+    if "mean_eigenvalue_error" in jacobi_results:
+        print(f"  Eigenvalue error:    {jacobi_results['mean_eigenvalue_error']:.6e}")
+    
+    # -----------------------------------------------------------------------
+    # Per-Component Error
+    # -----------------------------------------------------------------------
+    print("\nPer-component trajectory errors:")
+    
+    comp_errors = analyzer.trajectory_error_per_component(
+        z_pred[np.newaxis, :, :],
+        z_timeseries[np.newaxis, :, :]
+    )
+    analyzer.results["component_errors"] = comp_errors
+    
+    for comp_idx, error in comp_errors.items():
+        print(f"  Component {comp_idx}: {error:.6e}")
+    
+    # -----------------------------------------------------------------------
+    # Generate Report
+    # -----------------------------------------------------------------------
+    print("\n" + analyzer.generate_report())
+    
+    return analyzer
+
+
+# ============================================================================
+# STEP 6: COMPARE WITH GROUND TRUTH (if available)
 # ============================================================================
 
 def compare_with_ground_truth(learner, dim):
@@ -301,31 +424,36 @@ def compare_with_ground_truth(learner, dim):
     """
     
     print("\n" + "="*70)
-    print("VALIDATION (comparing learned vs true dynamics)")
+    print("STEP 6: FURTHER VALIDATION")
     print("="*70)
     
     print("""
-    If you have ground truth trajectories:
+    The HamiltonianSystemAnalyzer (STEP 5) provides comprehensive analysis:
     
-    1. Simulate with learned model:
-        # Use energy and L_tensor networks to simulate
+    1. Trajectory Discrepancy:
+        - Measures how well learned model reproduces data
+        - Good range: RMSE < 1e-3
     
-    2. Compare error:
-        error = mean(|z_learned - z_true|)
+    2. Jacobi Identity (Poisson Structure):
+        - Verifies L + L^T = 0 (antisymmetry)
+        - Checks eigenvalues are purely imaginary
+        - Good range: error < 1e-4
     
-    3. Check structure conservation:
-        # Energy should be conserved
-        H_initial = energy(z0)
-        H_final = energy(z_final)
-        energy_error = abs(H_final - H_initial)
-        
-        # Poisson structure should satisfy Jacobi identity
-        # (checked automatically during training with Jacobi loss)
+    3. Per-Component Errors:
+        - Shows which variables are learned better
+        - Balanced errors indicate good learning
     
-    4. Convergence metrics:
-        # See validation losses during training
-        # Implicit method: final validation error < 0.1 is good
-        """)
+    4. Energy Conservation:
+        - Optional: compare energy along trajectory
+        - Good range: relative error < 1%
+    
+    Advanced validation with ground truth:
+    
+    - Generate long-term predictions and compare
+    - Check Lyapunov exponents (for chaotic systems)
+    - Validate Casimir invariants if applicable
+    - Use analyzer.plot_*() for visualizations
+    """)
 
 
 # ============================================================================
@@ -334,7 +462,7 @@ def compare_with_ground_truth(learner, dim):
 
 def main():
     """
-    Complete workflow: Load data → Train → Extract L and H
+    Complete workflow: Load data → Train → Extract L and H → Analyze
     """
     
     print("="*70)
@@ -358,7 +486,10 @@ def main():
     # STEP 4: Extract learned functions
     learned_funcs = extract_learned_functions(learner, dim)
     
-    # STEP 5: Validation
+    # STEP 5: Analyze learned model quality
+    analyzer = analyze_learned_model(learner, z_timeseries, dim, dt)
+    
+    # STEP 6: Further validation
     compare_with_ground_truth(learner, dim)
     
     print("\n" + "="*70)
@@ -370,8 +501,9 @@ def main():
     1. Load your own data in STEP 1
     2. Adjust epochs, batch_size, neurons for better accuracy
     3. Try different methods: "without", "soft", "implicit"
-    4. Export learned models for use in external code
-    5. Compare learned dynamics with ground truth trajectories
+    4. Use analyzer.plot_*() to visualize results
+    5. Export learned models for use in external code
+    6. Compare learned dynamics with ground truth trajectories
     
     For more details, see:
     - L_H_RECOVERY_ARCHITECTURE.md (detailed explanation)

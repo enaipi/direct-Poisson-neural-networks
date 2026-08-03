@@ -1,3 +1,7 @@
 """Postprocessing utilities and plotting functions."""
 
-__all__ = []
+from .hamiltonian_analysis import HamiltonianSystemAnalyzer
+
+__all__ = [
+    "HamiltonianSystemAnalyzer",
+]
