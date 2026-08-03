@@ -36,7 +36,7 @@ def main():
         steps=500,                          # Integration steps per trajectory
         
         # Methods to compare
-        methods=["without", "implicit", "soft"],
+        methods=["without", "soft"],        # Note: implicit not yet implemented for P2D
         
         # Initial conditions
         init_mx=0.5,                        # x momentum

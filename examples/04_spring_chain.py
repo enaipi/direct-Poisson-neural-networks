@@ -38,7 +38,7 @@ def main():
         steps=300,                          # Shorter steps for high-dim (computational cost)
         
         # Methods to compare
-        methods=["without", "implicit", "soft"],
+        methods=["without", "soft"],        # Note: implicit not yet implemented for Sh
         
         # Learning parameters (adjusted for high-dimensional system)
         neurons=128,                        # Larger network for 200D
