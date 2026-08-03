@@ -33,11 +33,11 @@ import torch
 import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
 import math
+from pathlib import Path
 
 from dpnn.simulation import simulate_batch, save_simulation
 from dpnn.training import (
     HamiltonianLearner,
-    check_folder,
     DEFAULT_folder_name,
     DEFAULT_dataset,
     DEFAULT_jacobi_loss_mode,
@@ -46,8 +46,19 @@ from dpnn.training import (
 
 
 # ============================================================================
-# CONFIGURATION CLASS
+# UTILITIES
 # ============================================================================
+
+def check_folder(folder_name: str) -> bool:
+    """Check if a folder exists and create all necessary subdirectories."""
+    path = Path(folder_name)
+    path.mkdir(parents=True, exist_ok=True)
+    
+    # Also create required subdirectories
+    (path / "data").mkdir(parents=True, exist_ok=True)
+    (path / "saved_models").mkdir(parents=True, exist_ok=True)
+    
+    return True
 
 @dataclass
 class ComparisonConfig:
