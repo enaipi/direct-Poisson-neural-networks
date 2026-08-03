@@ -36,9 +36,7 @@ import math
 
 from dpnn.simulation import simulate_batch, save_simulation
 from dpnn.training import (
-    Learner,
-    LearnerIMR,
-    LearnerRK4,
+    HamiltonianLearner,
     check_folder,
     DEFAULT_folder_name,
     DEFAULT_dataset,
@@ -188,7 +186,7 @@ class ComparisonRunner:
         if self.config.verbose:
             print(f"Configuration saved to: {config_path}")
     
-    def _get_learner(self, method: str) -> Learner:
+    def _get_learner(self, method: str) -> HamiltonianLearner:
         """Create and return appropriate learner."""
         learner_kwargs = {
             "model": self.config.model,
@@ -215,13 +213,13 @@ class ComparisonRunner:
         if method in ["soft", "without"]:
             learner_kwargs["use_constant_L"] = self.config.const_L
         
-        # Select learner class based on scheme
+        # Set integration scheme based on config
         if self.config.scheme == "IMR":
-            return LearnerIMR(**learner_kwargs)
+            learner_kwargs["integration_scheme"] = "imr"
         elif self.config.scheme == "RK4":
-            return LearnerRK4(**learner_kwargs)
-        else:
-            return Learner(**learner_kwargs)
+            learner_kwargs["integration_scheme"] = "rk4"
+        
+        return HamiltonianLearner(**learner_kwargs)
     
     def _simulate_learned_models(self, args):
         """Simulate with trained learned models and save trajectories."""
