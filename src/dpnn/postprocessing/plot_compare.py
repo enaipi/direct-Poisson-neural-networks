@@ -130,6 +130,68 @@ def plot_first(field):
     plt.show()
 
 
+def plot_fields_errors(fields, field_name=""):
+    """Plot histograms of field errors (learned vs ground truth)."""
+    if not methods.get("GT"):
+        print("Warning: Ground truth data required for error plotting")
+        return
+    
+    dfgt = methods["GT"]["df"]
+    print(f"Plotting errors of fields: {fields}")
+    file_name = args.model + "_" + field_name + "-errors"
+    
+    for method_key in ['without', 'soft', 'implicit']:
+        if method_key not in methods or methods[method_key]['df'] is None:
+            continue
+        
+        if (method_key == 'without' and not args.without) or \
+           (method_key == 'soft' and not args.soft) or \
+           (method_key == 'implicit' and not args.implicit):
+            continue
+        
+        data_frame = methods[method_key]['df']
+        name = methods[method_key]['title']
+        
+        values = {}
+        gt = {}
+        for field in fields:
+            if field not in data_frame.columns or field not in dfgt.columns:
+                print(f"Warning: Field {field} not found in data")
+                continue
+            values[field] = data_frame[field].values
+            gt[field] = dfgt[field].values[:len(values[field])]
+        
+        if not values:
+            continue
+        
+        # Compute total squared error for all fields
+        total_error = np.sum(np.array([values[field] - gt[field] for field in fields if field in values]) ** 2, axis=0)
+        
+        if len(total_error) == 0:
+            continue
+        
+        average_error = np.median(total_error)
+        print(f"Median {field_name} error for {name}: {average_error}")
+        
+        file_name_current = file_name + "-" + name
+        if args.export:
+            add_log(file_name_current + " " + field_name, average_error)
+        
+        try:
+            plt.figure()
+            plt.hist(np.log10(total_error + 1e-10), bins=100, label=name, alpha=0.7)
+            plt.legend()
+            plt.xlabel(f"Trajectory errors (log10): {field_name}")
+            plt.ylabel("Frequency")
+            if args.export:
+                file_name_out = args.folder_name + "/" + file_name_current + ".png"
+                print(f"Exporting figure to: {file_name_out}")
+                plt.savefig(file_name_out)
+            plt.show()
+        except Exception as e:
+            print(f"Error plotting histogram: {e}")
+
+
 def plot_compatibility_errors():
     """Plot L compatibility errors."""
     file_name = "compatibility_errors"
@@ -409,6 +471,13 @@ def main():
     
     if args.plot_L_errors:
         plot_L_errors()
+    
+    if args.plot_RB_errors:
+        plot_fields_errors(["mx", "my", "mz"], field_name="m")
+    
+    if args.plot_HT_errors:
+        plot_fields_errors(["mx", "my", "mz"], field_name="m")
+        plot_fields_errors(["rx", "ry", "rz"], field_name="r")
     
     if args.plot_Es:
         plot_energy_models()

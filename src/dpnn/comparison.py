@@ -85,7 +85,7 @@ class ComparisonConfig:
     dt: float = 0.0  # 0.0 = automatic
     alpha: float = 2.0
     lr: float = 0.001
-    epochs: int = 60
+    epochs: int = 20
     prefactor: float = 1.0
     jac_prefactor: float = 1.0
     dropout_rate: float = 0.3
@@ -223,6 +223,141 @@ class ComparisonRunner:
         else:
             return Learner(**learner_kwargs)
     
+    def _simulate_learned_models(self, args):
+        """Simulate with trained learned models and save trajectories."""
+        import gc
+        
+        # Load GT data to extract initial conditions
+        gt_path = Path(args.folder_name) / "data" / "generalization.xyz"
+        if not gt_path.exists():
+            print(f"Warning: Ground truth data not found at {gt_path}")
+            print("Cannot simulate learned models without initial conditions.")
+            return
+        
+        print(f"Loading initial conditions from: {gt_path}")
+        gt_df = pd.read_csv(gt_path)
+        
+        # Extract unique initial conditions from GT data
+        # Assuming time==0 rows contain the initial states
+        initial_states_df = gt_df[gt_df['time'] == 0].copy()
+        
+        if len(initial_states_df) == 0:
+            print("Warning: No initial conditions found (time==0)")
+            # Try to get first state of each trajectory
+            initial_states_df = gt_df.groupby(level=0).first() if len(gt_df.index.names) > 1 else gt_df.iloc[::len(gt_df)//max(1,int(len(gt_df)/args.points))].reset_index(drop=True)
+        
+        # Extract initial conditions based on model
+        if args.model == "RB":
+            initial_m_cols = ["mx", "my", "mz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+            # Pad with zeros for r if needed
+            if len(initial_conditions_tensor.shape) == 2 and initial_conditions_tensor.shape[1] == 3:
+                initial_conditions_tensor = torch.cat(
+                    [initial_conditions_tensor, torch.zeros(initial_conditions_tensor.shape[0], 3, device=args.device)], 
+                    dim=1
+                )
+        elif args.model in ["HT", "P3D", "K3D"]:
+            initial_m_cols = ["mx", "my", "mz"]
+            initial_r_cols = ["rx", "ry", "rz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        elif args.model == "P2D":
+            initial_m_cols = ["mx", "my"]
+            initial_r_cols = ["rx", "ry"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        elif args.model == "Sh":
+            initial_m_cols = ["mu"]
+            initial_r_cols = ["rx", "ry", "rz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        else:
+            print(f"Warning: Model {args.model} not yet supported for learned model simulation")
+            return
+        
+        print(f"Extracted {len(initial_conditions_tensor)} initial conditions")
+        
+        # Create batches
+        initial_condition_batches = split_into_batches(initial_conditions_tensor, args.simulation_batch_size)
+        batched_inputs = [(args, batch) for batch in initial_condition_batches]
+        
+        # Simulate with each learned method
+        if "implicit" in self.config.methods and models_exist(args.folder_name, "implicit"):
+            print("\n>>> Simulating with learned implicit model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_implicit, batched_inputs)
+                else:
+                    dfs = [simulate_batch_implicit(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_implicit.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating implicit: {e}")
+        
+        if "soft" in self.config.methods and models_exist(args.folder_name, "soft"):
+            print("\n>>> Simulating with learned soft model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_soft, batched_inputs)
+                else:
+                    dfs = [simulate_batch_soft(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_soft.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating soft: {e}")
+        
+        if "without" in self.config.methods and models_exist(args.folder_name, "without"):
+            print("\n>>> Simulating with learned without model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_without, batched_inputs)
+                else:
+                    dfs = [simulate_batch_without(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_without.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating without: {e}")
+    
     def run(self):
         """Run the full comparison."""
         import gc
@@ -302,6 +437,12 @@ class ComparisonRunner:
             gc.collect()
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()
+        
+        # Simulate with learned models after training
+        print("\n" + "-" * 70)
+        print("Simulating learned models")
+        print("-" * 70)
+        self._simulate_learned_models(args)
         
         # Plot results
         if not self.config.no_show:
