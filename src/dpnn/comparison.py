@@ -238,13 +238,18 @@ class ComparisonRunner:
         gt_df = pd.read_csv(gt_path)
         
         # Extract unique initial conditions from GT data
-        # Assuming time==0 rows contain the initial states
-        initial_states_df = gt_df[gt_df['time'] == 0].copy()
+        # Get the first row of each trajectory (where time is minimal within each group)
+        # Detect trajectory boundaries by looking for time resets (time going backward)
+        gt_df['trajectory_id'] = 0
+        time_resets = (gt_df['time'].diff() < 0).fillna(False)
+        gt_df['trajectory_id'] = time_resets.cumsum()
+        
+        # Get the first row from each trajectory
+        initial_states_df = gt_df.groupby('trajectory_id').first().reset_index(drop=True)
         
         if len(initial_states_df) == 0:
-            print("Warning: No initial conditions found (time==0)")
-            # Try to get first state of each trajectory
-            initial_states_df = gt_df.groupby(level=0).first() if len(gt_df.index.names) > 1 else gt_df.iloc[::len(gt_df)//max(1,int(len(gt_df)/args.points))].reset_index(drop=True)
+            print("Warning: Could not extract initial conditions from ground truth data")
+            return
         
         # Extract initial conditions based on model
         if args.model == "RB":

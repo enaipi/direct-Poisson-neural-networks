@@ -159,10 +159,18 @@ def plot_fields_errors(fields, field_name=""):
                 print(f"Warning: Field {field} not found in data")
                 continue
             values[field] = data_frame[field].values
-            gt[field] = dfgt[field].values[:len(values[field])]
+            gt[field] = dfgt[field].values
         
         if not values:
             continue
+        
+        # Ensure both arrays have the same length (use minimum)
+        min_len = min(len(v) for v in values.values()) if values else 0
+        min_len = min(min_len, len(gt[list(gt.keys())[0]]) if gt else min_len)
+        
+        for field in list(values.keys()):
+            values[field] = values[field][:min_len]
+            gt[field] = gt[field][:min_len]
         
         # Compute total squared error for all fields
         total_error = np.sum(np.array([values[field] - gt[field] for field in fields if field in values]) ** 2, axis=0)

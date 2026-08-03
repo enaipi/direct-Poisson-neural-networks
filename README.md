@@ -11,7 +11,7 @@ All functionality is available through simple Python scripts (no installation re
 If you prefer command-line style, use Python scripts directly:
 
 ```bash
-python comparison.py --generate --steps=100 --implicit --soft --without --model=RB --folder_name=TEST
+python comparison.py --generate --steps=1000 --implicit --soft --without --model=RB --folder_name=TEST --epochs=30 --lr=0.0001
 python plot_compare.py --plot_RB_errors --GT --without --implicit --soft --folder_name=TEST
 ```
 
@@ -25,13 +25,13 @@ from src.dpnn.comparison import ComparisonConfig, ComparisonRunner
 # Configure the comparison
 config = ComparisonConfig(
     model="RB",
-    steps=100,
+    steps=1000,
     methods=["implicit", "soft", "without"],
     folder_name="my_test",
     neurons=64,
     layers=2,
-    epochs=50,
-    lr=0.001,
+    epochs=30,
+    lr=0.0001,
     generate=True,  # Generate training data
 )
 
@@ -69,11 +69,11 @@ Example with Heavy Top:
 
 ```bash
 # CLI style
-python comparison.py --generate --steps=100 --implicit --soft --without --model=HT --folder_name=TEST_HT
+python comparison.py --generate --steps=1000 --implicit --soft --without --model=HT --folder_name=TEST_HT --epochs=30 --lr=0.0001
 
 # Python API
 from src.dpnn.comparison import ComparisonConfig, ComparisonRunner
-config = ComparisonConfig(model="HT", folder_name="TEST_HT", generate=True)
+config = ComparisonConfig(model="HT", steps=1000, epochs=30, lr=0.0001, folder_name="TEST_HT", generate=True)
 runner = ComparisonRunner(config)
 runner.run()
 ```
@@ -95,15 +95,15 @@ plot_training_errors(config)
 
 First generate dataset for training with:
 
-    python simulate.py --generate --steps=50000 --model=RB
+    python simulate.py --generate --steps=10000 --model=RB
 
 for the rigid body (or `--model=HT` for heavy top, `--model=P3D` for particle in 3D, `--model=P2D` for particle in 2D, `--model=K3D` for kinematics, or `--model=Sh` for Shivamoggi particle)
 
 Then we train networks with different methods:
 
-    python learn.py --method=without --model=RB
-    python learn.py --method=soft --model=RB
-    python learn.py --method=implicit --model=RB
+    python learn.py --method=without --model=RB --epochs=30
+    python learn.py --method=soft --model=RB --epochs=30
+    python learn.py --method=implicit --model=RB --epochs=30
 
 (Choose the method: `without`, `soft`, or `implicit`)
 
