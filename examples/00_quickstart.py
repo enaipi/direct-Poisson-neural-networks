@@ -19,40 +19,75 @@ from pathlib import Path
 # STEP 1: PREPARE YOUR DATA
 # ============================================================================
 
+num_trajectories = 100
+num_steps = 100  # Longer trajectories for more data
+
 def prepare_data():
     """
-    Prepare time series data for learning.
+    Prepare Hamiltonian time series data for learning.
     
-    Input: Your time series as a numpy array or list
-    Output: Standard JSON format that the learner can consume
+    Generates trajectories from a 2D harmonic oscillator:
+    - State: z = (q1, p1, q2, p2) where q=position, p=momentum
+    - Hamiltonian: H(z) = 0.5(p1^2 + p2^2) + 0.5(q1^2 + 4*q2^2)
+    - Dynamics: dz/dt = L @ ∇H where L is the symplectic structure
+    
+    This is a canonical Hamiltonian system that the learner can recover.
     """
     
-    # EXAMPLE: You have a time series of states
-    # z(t_0), z(t_1), z(t_2), ..., z(t_n)
+    dim = 4  # 4D: q1, p1, q2, p2
+    dt = 0.001  # Very small time step for numerical stability
     
-    # Option A: Load from your file
-    # z_timeseries = np.load("your_trajectory.npy")  # shape: (n_steps, dim)
-    # OR
-    # import pandas as pd
-    # df = pd.read_csv("your_data.csv")
-    # z_timeseries = df[['z1', 'z2', 'z3', ...]].values  # shape: (n_steps, dim)
+    # Generate multiple trajectories with different initial conditions
+    trajectories = []
+    for traj_idx in range(num_trajectories):  # More trajectories
+        # Initial conditions: energy-limited (not too large)
+        q1_0 = 1.0 + 0.3 * traj_idx
+        p1_0 = 0.8 + 0.2 * traj_idx
+        q2_0 = 0.5 - 0.15 * traj_idx
+        p2_0 = 0.6 + 0.1 * traj_idx
+        
+        z = np.zeros((num_steps, dim))
+        z[0] = [q1_0, p1_0, q2_0, p2_0]
+        
+        # Integrate using symplectic Stormer-Verlet integrator (better structure preservation)
+        # This is more stable and better for learning Hamiltonian structure
+        for step in range(num_steps - 1):
+            q1, p1, q2, p2 = z[step]
+            
+            # Half-step momentum update: p = p + 0.5*dt*(-∇V)
+            # where ∇V = (q1, 0, 4*q2, 0) for V = 0.5*q1^2 + 0.5*4*q2^2
+            p1 = p1 - 0.5 * dt * q1
+            p2 = p2 - 0.5 * dt * 4 * q2
+            
+            # Full-step position update: q = q + dt*p (kinetic energy coefficient = 1)
+            q1 = q1 + dt * p1
+            q2 = q2 + dt * p2
+            
+            # Half-step momentum update
+            p1 = p1 - 0.5 * dt * q1
+            p2 = p2 - 0.5 * dt * 4 * q2
+            
+            z[step + 1] = [q1, p1, q2, p2]
+        
+        trajectories.append(z)
     
-    # Option B: For this example, create synthetic data
-    num_steps = 500
-    dim = 3  # 3D system (e.g., rigid body)
-    dt = 0.1
+    # Concatenate all trajectories
+    z_timeseries = np.concatenate(trajectories, axis=0)
     
-    # Synthetic trajectory: simple harmonic oscillator
-    t = np.arange(num_steps) * dt
-    z_timeseries = np.zeros((num_steps, dim))
-    for i in range(num_steps):
-        # Simple oscillation
-        z_timeseries[i] = 5 * np.sin(t[i] * np.array([1.0, 1.5, 2.0]))
+    # Normalize to reasonable scale (helps with learning)
+    z_mean = np.mean(z_timeseries, axis=0)
+    z_std = np.std(z_timeseries, axis=0)
+    z_std = np.where(z_std < 1e-6, 1.0, z_std)  # Avoid division by near-zero
+    z_timeseries = (z_timeseries - z_mean) / z_std
     
-    print(f"Loaded time series: shape = {z_timeseries.shape}")
-    print(f"  States per sample: {num_steps}")
-    print(f"  State dimension: {dim}")
+    print(f"Generated Hamiltonian trajectories:")
+    print(f"  Shape: {z_timeseries.shape}")
+    print(f"  States per trajectory: {num_steps}")
+    print(f"  Number of trajectories: {num_trajectories}")
+    print(f"  State dimension: {dim} (q1, p1, q2, p2)")
     print(f"  Time step: {dt}")
+    print(f"  System: 2D Harmonic Oscillator (canonical Hamiltonian)")
+    print(f"  Data normalized - Mean: {z_mean}, Std: {z_std}")
     
     return z_timeseries, dim, dt
 
@@ -70,17 +105,22 @@ def convert_to_standard_format(z_timeseries, dim, dt):
     """
     import json
     
-    # Your single trajectory
-    trajectories = [z_timeseries]  # Can have multiple trajectories
+    # Split concatenated trajectories back into individual trajectories
+    # (Each trajectory has ~2000 steps)
+    num_steps_per_traj = len(z_timeseries) // num_trajectories
+    trajectories = [
+        z_timeseries[i*num_steps_per_traj:(i+1)*num_steps_per_traj]
+        for i in range(num_trajectories)
+    ]
     
     # Create standard JSON structure
     data = {
         "metadata": {
-            "system_name": "CustomSystem",
+            "system_name": "HarmonicOscillator2D",
             "dimension": dim,
             "dt": dt,
             "num_trajectories": len(trajectories),
-            "units": {"state": "unknown", "time": "s"}
+            "units": {"state": "canonical (q,p)", "time": "s"}
         },
         "trajectories": [
             {
@@ -134,13 +174,15 @@ def train_model(data_path, dim, method="soft", epochs=20):
     
     # Initialize learner with system spec (bypasses legacy data loading)
     device = torch.device('cpu')
+    batch_size = 8  # Small batches for stable training
+    
     learner = HamiltonianLearner(
         system_spec=system_spec,
-        batch_size=32,
-        neurons=64,
-        layers=2,
+        batch_size=batch_size,
+        neurons=128,        # Larger network for better fitting
+        layers=3,           # More layers for complexity
         device=device,
-        dropout_rate=0.1,
+        dropout_rate=0.02,  # Very low dropout for small dataset
         jacobi_loss_mode="spectral",  # Use spectral Jacobi constraint
         integration_scheme="imr",      # Implicit midpoint rule
         use_constant_L=False,           # Learn L(z) from data
@@ -150,7 +192,7 @@ def train_model(data_path, dim, method="soft", epochs=20):
     # Load data from standard JSON
     dataset = TrajectoryDataset.from_standard_json(data_path)
     
-    # Create data loaders
+    # Create data loaders with same batch size
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_data, val_data = torch.utils.data.random_split(
@@ -158,21 +200,23 @@ def train_model(data_path, dim, method="soft", epochs=20):
     )
     
     learner.train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=32, shuffle=True
+        train_data, batch_size=batch_size, shuffle=True
     )
     learner.valid_loader = torch.utils.data.DataLoader(
-        val_data, batch_size=32, shuffle=False
+        val_data, batch_size=batch_size, shuffle=False
     )
     
     print(f"  Train samples: {len(train_data)}, Val samples: {len(val_data)}")
+    print(f"  Batch size: {batch_size}")
+    print(f"  Network: {128} neurons × 3 layers")
     
     # Train using HamiltonianLearner.learn() API
     learner.learn(
         method=method,
-        learning_rate=1e-4,
+        learning_rate=1e-4,     # Very small learning rate for small normalized data
         epochs=epochs,
-        prefactor=1.0,
-        jac_prefactor=0.01  # Weight for Jacobi constraint
+        prefactor=0.5,          # Scale main loss (focus on Jacobi)
+        jac_prefactor=1.0       # High weight for Jacobi (critical for Hamiltonian structure)
     )
     
     print(f"✓ Training complete!")
@@ -298,10 +342,9 @@ def analyze_learned_model(learner, z_timeseries, dim, dt):
     """
     Use HamiltonianSystemAnalyzer to measure learning quality.
     
-    Computes:
+    Computes and displays:
     - Trajectory discrepancy (learned vs ground truth)
     - Jacobi identity error (Poisson structure validation)
-    - Energy conservation
     - Per-component error breakdown
     """
     from dpnn.postprocessing import HamiltonianSystemAnalyzer
@@ -313,61 +356,126 @@ def analyze_learned_model(learner, z_timeseries, dim, dt):
     # Create analyzer
     analyzer = HamiltonianSystemAnalyzer(
         dimension=dim,
-        system_name="QuickstartExample"
+        system_name="HarmonicOscillator2D"
     )
     
     # -----------------------------------------------------------------------
-    # Generate predictions with learned model
+    # Split concatenated trajectories back into individual trajectories
     # -----------------------------------------------------------------------
-    print("\nGenerating predictions with learned model...")
+    num_steps_per_traj = len(z_timeseries) // 4
+    z_traj_list = [
+        z_timeseries[i*num_steps_per_traj:(i+1)*num_steps_per_traj]
+        for i in range(4)
+    ]
     
-    z_pred = [z_timeseries[0]]  # Start with first state
+    print(f"\nGenerating predictions for {len(z_traj_list)} trajectories...")
     
     learner.energy.eval()
     learner.L_tensor.eval()
     
-    with torch.no_grad():
-        z_current = torch.tensor(z_timeseries[0], dtype=torch.float32)
+    # Generate predictions for each trajectory
+    z_pred_list = []
+    
+    for traj_idx, z_traj_truth in enumerate(z_traj_list):
+        z_pred = [z_traj_truth[0]]  # Start with first state
+        z_current = torch.tensor(z_traj_truth[0], dtype=torch.float32)
         
-        for step in range(1, len(z_timeseries)):
-            # Compute ∇H
+        for step in range(1, len(z_traj_truth)):
+            # Compute ∇H (needs gradients)
             z_current = z_current.clone().detach().requires_grad_(True)
             H = learner.energy(z_current.unsqueeze(0))
             H.backward()
-            grad_H = z_current.grad.clone()
+            grad_H = z_current.grad.detach().clone()  # Properly detach before using
             
-            # Get L(z)
+            # Get L(z) and advance (no gradients needed)
             with torch.no_grad():
                 L_z = learner.forward_L_tensor(z_current.unsqueeze(0))[0]
-                z_dot = L_z @ grad_H
-                z_next = z_current.detach() + dt * z_dot
-                z_pred.append(z_next.numpy())
-                z_current = z_next
+                z_dot = L_z @ grad_H  # Both tensors are now detached
+                z_next = (z_current.detach() + dt * z_dot).cpu().numpy()
+                z_pred.append(z_next)
+                z_current = torch.tensor(z_next, dtype=torch.float32)
+        
+        z_pred_list.append(np.array(z_pred))
     
-    z_pred = np.array(z_pred)
-    print(f"  Generated {len(z_pred)} predictions")
+    z_pred_array = np.array(z_pred_list)
+    z_truth_array = np.array(z_traj_list)
+    
+    print(f"✓ Generated {len(z_pred_list)} trajectories")
+    print(f"  Shapes - Learned: {z_pred_array.shape}, Truth: {z_truth_array.shape}")
+    
+    # Check for NaN/inf values
+    pred_has_nan = np.any(np.isnan(z_pred_array)) or np.any(np.isinf(z_pred_array))
+    truth_has_nan = np.any(np.isnan(z_truth_array)) or np.any(np.isinf(z_truth_array))
+    print(f"  Learned has NaN/inf: {pred_has_nan}")
+    print(f"  Truth has NaN/inf: {truth_has_nan}")
+    
+    if pred_has_nan:
+        print(f"  WARNING: Learned predictions contain NaN/inf!")
+        nan_count = np.sum(np.isnan(z_pred_array))
+        inf_count = np.sum(np.isinf(z_pred_array))
+        print(f"    NaN count: {nan_count}, Inf count: {inf_count}")
+        print(f"    Sample learned values: {z_pred_array[0, :5, :]}")
+    
+    if truth_has_nan:
+        print(f"  WARNING: Ground truth contains NaN/inf!")
+    
+    # Check for trajectory divergence/explosion
+    pred_max = np.nanmax(np.abs(z_pred_array))
+    truth_max = np.nanmax(np.abs(z_truth_array))
+    print(f"  Max absolute values - Learned: {pred_max:.6e}, Truth: {truth_max:.6e}")
+    
+    if pred_max > 1e3:
+        print(f"  WARNING: Learned trajectory has exploded! (max > 1e3)")
     
     # -----------------------------------------------------------------------
-    # Trajectory Discrepancy Analysis
+    # Trajectory Fit Error (matching unified pipeline)
     # -----------------------------------------------------------------------
-    print("\nAnalyzing trajectory discrepancy...")
+    print("\n--- Trajectory Fit Error ---")
     
-    traj_results = analyzer.compute_trajectory_discrepancy(
-        z_pred[np.newaxis, :, :],  # Wrap as (1, num_steps, dim)
-        z_timeseries[np.newaxis, :, :],
-        metric="rmse"
-    )
-    
-    analyzer.results["trajectory_discrepancy"] = traj_results
-    
-    print(f"  Mean RMSE:   {traj_results['mean_error']:.6e}")
-    print(f"  Max RMSE:    {traj_results['max_error']:.6e}")
-    print(f"  Median RMSE: {traj_results['median_error']:.6e}")
+    try:
+        # Compute difference
+        diff = z_pred_array - z_truth_array
+        rmse_per_point = np.sqrt(np.mean(diff**2, axis=2))  # (num_traj, num_steps)
+        
+        # Check for NaN
+        if np.any(np.isnan(rmse_per_point)):
+            print(f"  WARNING: RMSE computation resulted in NaN")
+            print(f"    Diff has NaN: {np.any(np.isnan(diff))}")
+            print(f"    Diff has inf: {np.any(np.isinf(diff))}")
+            print(f"    Diff min: {np.nanmin(diff)}, max: {np.nanmax(diff)}")
+        
+        # Flatten to get all RMSE values
+        rmse_flat = rmse_per_point.flatten()
+        rmse_flat = rmse_flat[~np.isnan(rmse_flat)]  # Remove NaN for stats
+        
+        if len(rmse_flat) == 0:
+            print(f"  ERROR: All RMSE values are NaN!")
+            traj_results = {
+                'mean_error': np.nan,
+                'median_error': np.nan,
+                'max_error': np.nan
+            }
+        else:
+            traj_results = {
+                'mean_error': np.mean(rmse_flat),
+                'median_error': np.median(rmse_flat),
+                'max_error': np.max(rmse_flat)
+            }
+        
+        analyzer.results["trajectory_discrepancy"] = traj_results
+        
+        print(f"  Mean RMSE:   {traj_results['mean_error']:.6e}")
+        print(f"  Median RMSE: {traj_results['median_error']:.6e}")
+        print(f"  Max RMSE:    {traj_results['max_error']:.6e}")
+    except Exception as e:
+        print(f"  Error computing trajectory discrepancy: {e}")
+        import traceback
+        traceback.print_exc()
     
     # -----------------------------------------------------------------------
-    # Jacobi Identity Analysis (Poisson Structure)
+    # Jacobi Identity Error (matching unified pipeline)
     # -----------------------------------------------------------------------
-    print("\nAnalyzing Poisson structure (Jacobi identity)...")
+    print("\n--- Jacobi Identity Error ---")
     
     # Sample L matrices at different states
     L_samples = []
@@ -382,30 +490,35 @@ def analyze_learned_model(learner, z_timeseries, dim, dt):
     
     L_samples = np.array(L_samples)
     
-    jacobi_results = analyzer.compute_jacobi_error(L_samples, method="spectral")
-    analyzer.results["jacobi_error"] = jacobi_results
-    
-    print(f"  Antisymmetry error:  {jacobi_results['mean_antisymmetry_error']:.6e}")
-    print(f"    Max antisymmetry:  {jacobi_results['max_antisymmetry_error']:.6e}")
-    if "mean_eigenvalue_error" in jacobi_results:
-        print(f"  Eigenvalue error:    {jacobi_results['mean_eigenvalue_error']:.6e}")
-    
-    # -----------------------------------------------------------------------
-    # Per-Component Error
-    # -----------------------------------------------------------------------
-    print("\nPer-component trajectory errors:")
-    
-    comp_errors = analyzer.trajectory_error_per_component(
-        z_pred[np.newaxis, :, :],
-        z_timeseries[np.newaxis, :, :]
-    )
-    analyzer.results["component_errors"] = comp_errors
-    
-    for comp_idx, error in comp_errors.items():
-        print(f"  Component {comp_idx}: {error:.6e}")
+    try:
+        jacobi_results = analyzer.compute_jacobi_error(L_samples, method="spectral")
+        analyzer.results["jacobi_error"] = jacobi_results
+        
+        print(f"  Antisymmetry error:  {jacobi_results['mean_antisymmetry_error']:.6e}")
+        if "max_antisymmetry_error" in jacobi_results:
+            print(f"  Max antisymmetry:    {jacobi_results['max_antisymmetry_error']:.6e}")
+    except Exception as e:
+        print(f"  Error computing Jacobi error: {e}")
     
     # -----------------------------------------------------------------------
-    # Generate Report
+    # Per-Component Error (optional detail)
+    # -----------------------------------------------------------------------
+    print("\n--- Per-Component Error ---")
+    
+    try:
+        comp_errors = analyzer.trajectory_error_per_component(
+            z_pred_array,
+            z_truth_array
+        )
+        analyzer.results["component_errors"] = comp_errors
+        
+        for comp_idx in sorted(comp_errors.keys()):
+            print(f"  Component {comp_idx}: {comp_errors[comp_idx]:.6e}")
+    except Exception as e:
+        print(f"  Error computing per-component errors: {e}")
+    
+    # -----------------------------------------------------------------------
+    # Summary Report
     # -----------------------------------------------------------------------
     print("\n" + analyzer.generate_report())
     
@@ -479,8 +592,8 @@ def main():
     learner = train_model(
         data_path, 
         dim, 
-        method="soft",  # Use soft Jacobi constraint
-        epochs=10       # Fewer epochs for quick demo
+        method="soft",      # Use soft Jacobi constraint
+        epochs=50           # More epochs for Hamiltonian data
     )
     
     # STEP 4: Extract learned functions
