@@ -42,6 +42,13 @@ from .particle_2d import (
     Particle2DNeural,
 )
 
+from .fpu import (
+    FPUCN,
+    FPUIMR,
+    FPUNeural,
+    FPUNeuralIMR,
+)
+
 from .shivamoggi_particlend import (
     ShivamoggiIMR,
     ShivamoggiNeural,
@@ -82,6 +89,12 @@ __all__ = [
     # 2D Particle models
     "Particle2DIMR",
     "Particle2DNeural",
+
+    # Fermi-Pasta-Ulam models
+    "FPUCN",
+    "FPUIMR",
+    "FPUNeural",
+    "FPUNeuralIMR",
     
     # Shivamoggi and N-D particle models
     "ShivamoggiIMR",
