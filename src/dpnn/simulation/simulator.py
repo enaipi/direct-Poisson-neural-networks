@@ -5,7 +5,7 @@ from math import sqrt
 
 from dpnn.models.rigid_body import *
 import pandas as pd
-from dpnn.training.learner import DEFAULT_folder_name
+from dpnn.training import DEFAULT_folder_name
 import torch
 
 def save_simulation(data_frame, file_name): #save data to file_name
@@ -272,7 +272,8 @@ def simulate_batch(args, initial_states_batch, method = "normal"):
             (r, m) = solver.m_new()
 
         if i % store_each == 0:
-            t = torch.full((batch_size, 1), dt * i, device=m.device, dtype=torch.float32)
+            # Store the evolved state with the evolved time (i+1, not i)
+            t = torch.full((batch_size, 1), dt * (i + 1), device=m.device, dtype=torch.float32)
             ts.append(t)
 
             ms.append(m)

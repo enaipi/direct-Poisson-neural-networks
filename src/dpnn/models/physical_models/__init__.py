@@ -2,6 +2,10 @@
 
 from .base import (
     load_models,
+    GeneralSystem,
+)
+
+from .rigid_body import (
     RigidBody,
 )
 
@@ -38,6 +42,13 @@ from .particle_2d import (
     Particle2DNeural,
 )
 
+from .fpu import (
+    FPUCN,
+    FPUIMR,
+    FPUNeural,
+    FPUNeuralIMR,
+)
+
 from .shivamoggi_particlend import (
     ShivamoggiIMR,
     ShivamoggiNeural,
@@ -46,7 +57,8 @@ from .shivamoggi_particlend import (
 )
 
 __all__ = [
-    # Base classes and utilities
+    # Generic infrastructure
+    "GeneralSystem",
     "load_models",
     "RigidBody",
     
@@ -77,6 +89,12 @@ __all__ = [
     # 2D Particle models
     "Particle2DIMR",
     "Particle2DNeural",
+
+    # Fermi-Pasta-Ulam models
+    "FPUCN",
+    "FPUIMR",
+    "FPUNeural",
+    "FPUNeuralIMR",
     
     # Shivamoggi and N-D particle models
     "ShivamoggiIMR",

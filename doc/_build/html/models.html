@@ -57,9 +57,366 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="modules/models.html#physics-solvers-rigid-body">Physics Solvers (rigid_body)</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="modules/models.html#physical-models-physical-models">Physical Models (physical_models)</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.load_models"><code class="docutils literal notranslate"><span class="pre">load_models()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem"><code class="docutils literal notranslate"><span class="pre">GeneralSystem</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.get_E"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.get_L"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.get_grad_E"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_grad_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.get_zdot"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.m_new_explicit_euler"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_explicit_euler()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.m_new_crank_nicolson"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_crank_nicolson()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.m_new_implicit_midpoint"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_implicit_midpoint()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.m_new_rk4"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_rk4()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.base.GeneralSystem.m_new"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBEhrenfest"><code class="docutils literal notranslate"><span class="pre">RBEhrenfest</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBEhrenfest.m_new"><code class="docutils literal notranslate"><span class="pre">RBEhrenfest.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBESeReCN"><code class="docutils literal notranslate"><span class="pre">RBESeReCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBESeReCN.f"><code class="docutils literal notranslate"><span class="pre">RBESeReCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBESeReCN.m_new"><code class="docutils literal notranslate"><span class="pre">RBESeReCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBIMR"><code class="docutils literal notranslate"><span class="pre">RBIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBIMR.f"><code class="docutils literal notranslate"><span class="pre">RBIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBIMR.m_new"><code class="docutils literal notranslate"><span class="pre">RBIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBRK4"><code class="docutils literal notranslate"><span class="pre">RBRK4</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBRK4.m_dot"><code class="docutils literal notranslate"><span class="pre">RBRK4.m_dot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBRK4.m_new"><code class="docutils literal notranslate"><span class="pre">RBRK4.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBESeReFE"><code class="docutils literal notranslate"><span class="pre">RBESeReFE</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.rigid_body_integrators.RBESeReFE.m_new"><code class="docutils literal notranslate"><span class="pre">RBESeReFE.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural"><code class="docutils literal notranslate"><span class="pre">Neural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Neural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.f"><code class="docutils literal notranslate"><span class="pre">Neural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.get_cass"><code class="docutils literal notranslate"><span class="pre">Neural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.get_L"><code class="docutils literal notranslate"><span class="pre">Neural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.get_E"><code class="docutils literal notranslate"><span class="pre">Neural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.Neural.m_new"><code class="docutils literal notranslate"><span class="pre">Neural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.RBNeuralIMR"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.RBNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.neural.RBNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopCN"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopCN.get_E"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopCN.get_L"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopCN.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopCN.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopIMR"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopIMR.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopIMR.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.get_L"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.get_E"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeural.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeuralIMR"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.heavy_top.HeavyTopNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DCN"><code class="docutils literal notranslate"><span class="pre">Particle3DCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DCN.get_E"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DCN.get_L"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DCN.f"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DCN.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.f"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.get_L"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.get_E"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeural.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeuralIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DKeplerIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DKeplerIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_3d.Particle3DKeplerIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DIMR"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DIMR.get_E"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DIMR.get_L"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.f"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.get_L"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.get_E"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.particle_2d.Particle2DNeural.m_new"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.get_E"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.get_UV"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_UV()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.get_L"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.f"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.solve"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.solve()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiIMR.m_new"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.f"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.get_L"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.get_E"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ShivamoggiNeural.m_new"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCN"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCN.get_E"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCN.get_L"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCN.f"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCN.m_new"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural.f"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural.get_E"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural.get_L"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.shivamoggi_particlend.ParticleNDCNNeural.m_new"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem"><code class="docutils literal notranslate"><span class="pre">GeneralSystem</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.get_E"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.get_L"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.get_grad_E"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_grad_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.get_zdot"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.get_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.m_new_explicit_euler"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_explicit_euler()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.m_new_crank_nicolson"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_crank_nicolson()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.m_new_implicit_midpoint"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_implicit_midpoint()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.m_new_rk4"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new_rk4()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.GeneralSystem.m_new"><code class="docutils literal notranslate"><span class="pre">GeneralSystem.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.load_models"><code class="docutils literal notranslate"><span class="pre">load_models()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody"><code class="docutils literal notranslate"><span class="pre">RigidBody</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mx"><code class="docutils literal notranslate"><span class="pre">RigidBody.mx</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.my"><code class="docutils literal notranslate"><span class="pre">RigidBody.my</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mz"><code class="docutils literal notranslate"><span class="pre">RigidBody.mz</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mx0"><code class="docutils literal notranslate"><span class="pre">RigidBody.mx0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.my0"><code class="docutils literal notranslate"><span class="pre">RigidBody.my0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mz0"><code class="docutils literal notranslate"><span class="pre">RigidBody.mz0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.dtype"><code class="docutils literal notranslate"><span class="pre">RigidBody.dtype</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.tau"><code class="docutils literal notranslate"><span class="pre">RigidBody.tau</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.energy_x"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_x()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.energy_y"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_y()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.energy_z"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_z()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.energy"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.omega_x"><code class="docutils literal notranslate"><span class="pre">RigidBody.omega_x()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.omega_y"><code class="docutils literal notranslate"><span class="pre">RigidBody.omega_y()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.omega_z"><code class="docutils literal notranslate"><span class="pre">RigidBody.omega_z()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.m2"><code class="docutils literal notranslate"><span class="pre">RigidBody.m2()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mx2"><code class="docutils literal notranslate"><span class="pre">RigidBody.mx2()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.my2"><code class="docutils literal notranslate"><span class="pre">RigidBody.my2()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.mz2"><code class="docutils literal notranslate"><span class="pre">RigidBody.mz2()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.m_magnitude"><code class="docutils literal notranslate"><span class="pre">RigidBody.m_magnitude()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Ein"><code class="docutils literal notranslate"><span class="pre">RigidBody.Ein()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Ein_s"><code class="docutils literal notranslate"><span class="pre">RigidBody.Ein_s()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.ST"><code class="docutils literal notranslate"><span class="pre">RigidBody.ST()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Etot"><code class="docutils literal notranslate"><span class="pre">RigidBody.Etot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Sin"><code class="docutils literal notranslate"><span class="pre">RigidBody.Sin()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.S_x"><code class="docutils literal notranslate"><span class="pre">RigidBody.S_x()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.S_z"><code class="docutils literal notranslate"><span class="pre">RigidBody.S_z()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Phi_x"><code class="docutils literal notranslate"><span class="pre">RigidBody.Phi_x()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.Phi_z"><code class="docutils literal notranslate"><span class="pre">RigidBody.Phi_z()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.get_L"><code class="docutils literal notranslate"><span class="pre">RigidBody.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RigidBody.get_E"><code class="docutils literal notranslate"><span class="pre">RigidBody.get_E()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBEhrenfest"><code class="docutils literal notranslate"><span class="pre">RBEhrenfest</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBEhrenfest.m_new"><code class="docutils literal notranslate"><span class="pre">RBEhrenfest.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBESeReCN"><code class="docutils literal notranslate"><span class="pre">RBESeReCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBESeReCN.f"><code class="docutils literal notranslate"><span class="pre">RBESeReCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBESeReCN.m_new"><code class="docutils literal notranslate"><span class="pre">RBESeReCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBIMR"><code class="docutils literal notranslate"><span class="pre">RBIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBIMR.f"><code class="docutils literal notranslate"><span class="pre">RBIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBIMR.m_new"><code class="docutils literal notranslate"><span class="pre">RBIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBRK4"><code class="docutils literal notranslate"><span class="pre">RBRK4</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBRK4.m_dot"><code class="docutils literal notranslate"><span class="pre">RBRK4.m_dot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBRK4.m_new"><code class="docutils literal notranslate"><span class="pre">RBRK4.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBESeReFE"><code class="docutils literal notranslate"><span class="pre">RBESeReFE</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBESeReFE.m_new"><code class="docutils literal notranslate"><span class="pre">RBESeReFE.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural"><code class="docutils literal notranslate"><span class="pre">Neural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Neural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.f"><code class="docutils literal notranslate"><span class="pre">Neural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.get_cass"><code class="docutils literal notranslate"><span class="pre">Neural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.get_L"><code class="docutils literal notranslate"><span class="pre">Neural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.get_E"><code class="docutils literal notranslate"><span class="pre">Neural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Neural.m_new"><code class="docutils literal notranslate"><span class="pre">Neural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBNeuralIMR"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.RBNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">RBNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopCN"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopCN.get_E"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopCN.get_L"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopCN.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopCN.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopIMR"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopIMR.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopIMR.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.get_L"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.get_E"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeural.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeuralIMR"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.HeavyTopNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">HeavyTopNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DCN"><code class="docutils literal notranslate"><span class="pre">Particle3DCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DCN.get_E"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DCN.get_L"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DCN.f"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DCN.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.f"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.get_L"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.get_E"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeural.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeuralIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeuralIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DNeuralIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DNeuralIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DKeplerIMR"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DKeplerIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle3DKeplerIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle3DKeplerIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DIMR"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DIMR.get_E"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DIMR.get_L"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DIMR.f"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DIMR.m_new"><code class="docutils literal notranslate"><span class="pre">Particle2DIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.f"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.get_L"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.get_E"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.Particle2DNeural.m_new"><code class="docutils literal notranslate"><span class="pre">Particle2DNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.get_E"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.get_UV"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_UV()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.get_L"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.f"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.solve"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.solve()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiIMR.m_new"><code class="docutils literal notranslate"><span class="pre">ShivamoggiIMR.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.f"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.get_cass"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_cass()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.get_L"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.get_E"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ShivamoggiNeural.m_new"><code class="docutils literal notranslate"><span class="pre">ShivamoggiNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCN"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCN.get_E"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCN.get_L"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCN.f"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCN.m_new"><code class="docutils literal notranslate"><span class="pre">ParticleNDCN.m_new()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural.neural_zdot"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.neural_zdot()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural.f"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.f()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural.get_E"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.get_E()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural.get_L"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.get_L()</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.physical_models.ParticleNDCNNeural.m_new"><code class="docutils literal notranslate"><span class="pre">ParticleNDCNNeural.m_new()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="modules/models.html#backward-compatibility-rigid-body">Backward Compatibility (rigid_body)</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.load_models"><code class="docutils literal notranslate"><span class="pre">load_models()</span></code></a></li>
 <li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody"><code class="docutils literal notranslate"><span class="pre">RigidBody</span></code></a><ul>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.mx"><code class="docutils literal notranslate"><span class="pre">RigidBody.mx</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.my"><code class="docutils literal notranslate"><span class="pre">RigidBody.my</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.mz"><code class="docutils literal notranslate"><span class="pre">RigidBody.mz</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.mx0"><code class="docutils literal notranslate"><span class="pre">RigidBody.mx0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.my0"><code class="docutils literal notranslate"><span class="pre">RigidBody.my0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.mz0"><code class="docutils literal notranslate"><span class="pre">RigidBody.mz0</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.dtype"><code class="docutils literal notranslate"><span class="pre">RigidBody.dtype</span></code></a></li>
+<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.tau"><code class="docutils literal notranslate"><span class="pre">RigidBody.tau</span></code></a></li>
 <li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.energy_x"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_x()</span></code></a></li>
 <li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.energy_y"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_y()</span></code></a></li>
 <li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.rigid_body.RigidBody.energy_z"><code class="docutils literal notranslate"><span class="pre">RigidBody.energy_z()</span></code></a></li>
@@ -230,22 +587,7 @@
 </li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="modules/models.html#legacy-energy-module-energy">Legacy Energy Module (energy)</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.energy.EnergyNet"><code class="docutils literal notranslate"><span class="pre">EnergyNet</span></code></a><ul>
-<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.energy.EnergyNet.forward"><code class="docutils literal notranslate"><span class="pre">EnergyNet.forward()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.energy.TensorNet"><code class="docutils literal notranslate"><span class="pre">TensorNet</span></code></a><ul>
-<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.energy.TensorNet.forward"><code class="docutils literal notranslate"><span class="pre">TensorNet.forward()</span></code></a></li>
-<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.energy.TensorNet.get_jacobian"><code class="docutils literal notranslate"><span class="pre">TensorNet.get_jacobian()</span></code></a></li>
-</ul>
-</li>
-<li class="toctree-l4"><a class="reference internal" href="modules/models.html#dpnn.models.energy.JacVectorNet"><code class="docutils literal notranslate"><span class="pre">JacVectorNet</span></code></a><ul>
-<li class="toctree-l5"><a class="reference internal" href="modules/models.html#dpnn.models.energy.JacVectorNet.forward"><code class="docutils literal notranslate"><span class="pre">JacVectorNet.forward()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
+<li class="toctree-l3"><a class="reference internal" href="modules/models.html#legacy-energy-module-energy">Legacy Energy Module (energy)</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="modules/models.html#package-level-api">Package-level API</a><ul>

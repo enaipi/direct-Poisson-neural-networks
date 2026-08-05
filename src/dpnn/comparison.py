@@ -1,25 +1,473 @@
-from re import I
-import os, sys
+"""
+Pure Python comparison script for Poisson structure learning.
+
+Usage as Python:
+    from dpnn.comparison import ComparisonConfig, ComparisonRunner
+    
+    config = ComparisonConfig(
+        model="RB",
+        steps=100,
+        methods=["implicit", "soft", "without"],
+        folder_name="TEST"
+    )
+    runner = ComparisonRunner(config)
+    runner.run()
+
+Usage as CLI:
+    python comparison.py --model=RB --steps=100 --implicit --soft --without --folder_name=TEST
+"""
+
+from dataclasses import dataclass, field
+from typing import List, Optional
+import os
+import sys
 import argparse
-from dpnn.simulation import simulate_batch, save_simulation
-import math
+from pathlib import Path
+from math import sqrt
+import time
+import gc
+
 import numpy as np
 import pandas as pd
-import scipy as sp
+import torch
+import torch.multiprocessing as mp
 import matplotlib.pyplot as plt
-from math import sqrt
+import math
+from pathlib import Path
+
+from dpnn.simulation import simulate_batch, save_simulation
 from dpnn.training import (
-    Learner,
-    LearnerIMR,
-    LearnerRK4,
-    check_folder,
+    HamiltonianLearner,
     DEFAULT_folder_name,
     DEFAULT_dataset,
     DEFAULT_jacobi_loss_mode,
     DEFAULT_hutchinson_samples,
 )
-import torch.multiprocessing as mp
-import torch
+
+
+# ============================================================================
+# UTILITIES
+# ============================================================================
+
+def check_folder(folder_name: str) -> bool:
+    """Check if a folder exists and create all necessary subdirectories."""
+    path = Path(folder_name)
+    path.mkdir(parents=True, exist_ok=True)
+    
+    # Also create required subdirectories
+    (path / "data").mkdir(parents=True, exist_ok=True)
+    (path / "saved_models").mkdir(parents=True, exist_ok=True)
+    
+    return True
+
+@dataclass
+class ComparisonConfig:
+    """Configuration for comparison run."""
+    # Model and simulation
+    model: str = "RB"
+    steps: int = 100
+    scheme: str = "IMR"
+    
+    # Methods to compare
+    methods: List[str] = field(default_factory=lambda: ["implicit", "soft", "without"])
+    
+    # Initial conditions
+    init_mx: float = 10.0
+    init_my: float = 3.0
+    init_mz: float = 4.0
+    init_rx: float = 1.0
+    init_ry: float = -3.0
+    init_rz: float = 10.0
+    
+    # Model parameters
+    Ix: float = 10.0
+    Iy: float = 20.0
+    Iz: float = 40.0
+    Mgl: float = 9.81 * 0.1
+    M_tau: float = 0.0
+    M: float = 0.5
+    
+    # Learning parameters
+    neurons: int = 64
+    layers: int = 2
+    batch_size: int = 32
+    dt: float = 0.0  # 0.0 = automatic
+    alpha: float = 2.0
+    lr: float = 0.001
+    epochs: int = 20
+    prefactor: float = 1.0
+    jac_prefactor: float = 1.0
+    dropout_rate: float = 0.3
+    quad_features: bool = False
+    const_L: bool = False
+    
+    # Data
+    generate: bool = False
+    external_data: Optional[str] = None
+    external_data_simple_format: bool = False
+    sampling: int = 100
+    points: int = 100
+    seed: int = 42
+    
+    # Jacobi loss
+    jacobi_loss_mode: str = DEFAULT_jacobi_loss_mode
+    hutchinson_samples: int = DEFAULT_hutchinson_samples
+    
+    # Misc
+    folder_name: str = DEFAULT_folder_name
+    cuda: bool = False
+    multiprocessing: bool = False
+    simulation_batch_size: int = 256
+    no_data_to_gpu: bool = True
+    theta_sampling: int = 20
+    dimensions: int = 10
+    zeta: float = 0.0
+    verbose: bool = False
+    no_show: bool = False
+    
+    # Auto-computed
+    device: torch.device = field(init=False)
+    
+    def __post_init__(self):
+        """Set device after initialization."""
+        if self.cuda and torch.cuda.is_available():
+            self.device = torch.device("cuda")
+            print(f"Using GPU: {torch.cuda.get_device_name()}")
+        else:
+            self.device = torch.device("cpu")
+            # When using CPU, always keep data on CPU (no_data_to_gpu=True means keep data on CPU)
+            self.no_data_to_gpu = True
+            if self.verbose:
+                print("Using CPU")
+    
+    def to_namespace(self):
+        """Convert to argparse.Namespace for backward compatibility with helper functions."""
+        ns = argparse.Namespace(**self.__dict__)
+        # Add boolean flags for methods
+        ns.implicit = "implicit" in self.methods
+        ns.soft = "soft" in self.methods
+        ns.without = "without" in self.methods
+        return ns
+
+
+# ============================================================================
+# COMPARISON RUNNER
+# ============================================================================
+
+class ComparisonRunner:
+    """Runs comparison of different learning methods."""
+    
+    def __init__(self, config: ComparisonConfig):
+        """Initialize with configuration."""
+        self.config = config
+        self._validate_config()
+        self._setup()
+    
+    def _validate_config(self):
+        """Validate configuration."""
+        if "implicit" in self.config.methods and self.config.model in ["HT", "P3D", "K3D", "P2D", "Sh", "D"]:
+            raise ValueError(f"Implicit solver not yet implemented for {self.config.model}.")
+        
+        if self.config.model == "K3D" and self.config.scheme != "IMR":
+            raise ValueError("Don't use CN for Kepler.")
+        
+        if self.config.model in ("P2D", "Sh") and self.config.scheme != "IMR":
+            raise ValueError(f"Only use the IMR scheme for {self.config.model}.")
+        
+        if (("implicit" in self.config.methods or "soft" in self.config.methods) and self.config.const_L):
+            raise ValueError("Only use constant L with the without method.")
+        
+        if self.config.generate and self.config.external_data:
+            raise ValueError("Cannot use both generate and external_data. Choose one.")
+        
+        if self.config.external_data_simple_format and not self.config.external_data:
+            raise ValueError("Cannot use external_data_simple_format without external_data.")
+    
+    def _setup(self):
+        """Setup folders and save configuration."""
+        check_folder(self.config.folder_name)
+        
+        # Save config to file
+        config_path = Path(self.config.folder_name) / "config.txt"
+        with open(config_path, 'w') as f:
+            for key, value in self.config.__dict__.items():
+                if key != 'device':  # Skip device object
+                    f.write(f"{key}: {value}\n")
+        
+        if self.config.verbose:
+            print(f"Configuration saved to: {config_path}")
+    
+    def _get_learner(self, method: str) -> HamiltonianLearner:
+        """Create and return appropriate learner."""
+        learner_kwargs = {
+            "model": self.config.model,
+            "neurons": self.config.neurons,
+            "layers": self.config.layers,
+            "batch_size": self.config.batch_size,
+            "dt": self.config.dt,
+            "name": self.config.folder_name,
+            "device": self.config.device,
+            "dropout_rate": self.config.dropout_rate,
+            "quad_features": self.config.quad_features,
+            "simulation_batch_size": self.config.simulation_batch_size,
+            "no_data_to_gpu": self.config.no_data_to_gpu,
+            "jacobi_loss_mode": self.config.jacobi_loss_mode,
+            "hutchinson_samples": self.config.hutchinson_samples,
+            "external_data_path": self.config.external_data,
+            "external_data_simple_format": self.config.external_data_simple_format,
+            "verbose": self.config.verbose,
+        }
+        
+        if self.config.model in ["HT", "P3D", "K3D", "P2D", "Sh", "D"]:
+            learner_kwargs["D"] = self.config.dimensions
+        
+        if method in ["soft", "without"]:
+            learner_kwargs["use_constant_L"] = self.config.const_L
+        
+        # Set integration scheme based on config
+        if self.config.scheme == "IMR":
+            learner_kwargs["integration_scheme"] = "imr"
+        elif self.config.scheme == "RK4":
+            learner_kwargs["integration_scheme"] = "rk4"
+        
+        return HamiltonianLearner(**learner_kwargs)
+    
+    def _simulate_learned_models(self, args):
+        """Simulate with trained learned models and save trajectories."""
+        import gc
+        
+        # Load GT data to extract initial conditions
+        gt_path = Path(args.folder_name) / "data" / "generalization.xyz"
+        if not gt_path.exists():
+            print(f"Warning: Ground truth data not found at {gt_path}")
+            print("Cannot simulate learned models without initial conditions.")
+            return
+        
+        print(f"Loading initial conditions from: {gt_path}")
+        gt_df = pd.read_csv(gt_path)
+        
+        # Extract unique initial conditions from GT data
+        # Get the first row of each trajectory (where time is minimal within each group)
+        # Detect trajectory boundaries by looking for time resets (time going backward)
+        gt_df['trajectory_id'] = 0
+        time_resets = (gt_df['time'].diff() < 0).fillna(False)
+        gt_df['trajectory_id'] = time_resets.cumsum()
+        
+        # Get the first row from each trajectory
+        initial_states_df = gt_df.groupby('trajectory_id').first().reset_index(drop=True)
+        
+        if len(initial_states_df) == 0:
+            print("Warning: Could not extract initial conditions from ground truth data")
+            return
+        
+        # Extract initial conditions based on model
+        if args.model == "RB":
+            initial_m_cols = ["mx", "my", "mz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+            # Pad with zeros for r if needed
+            if len(initial_conditions_tensor.shape) == 2 and initial_conditions_tensor.shape[1] == 3:
+                initial_conditions_tensor = torch.cat(
+                    [initial_conditions_tensor, torch.zeros(initial_conditions_tensor.shape[0], 3, device=args.device)], 
+                    dim=1
+                )
+        elif args.model in ["HT", "P3D", "K3D"]:
+            initial_m_cols = ["mx", "my", "mz"]
+            initial_r_cols = ["rx", "ry", "rz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        elif args.model == "P2D":
+            initial_m_cols = ["mx", "my"]
+            initial_r_cols = ["rx", "ry"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        elif args.model == "Sh":
+            initial_m_cols = ["mu"]
+            initial_r_cols = ["rx", "ry", "rz"]
+            initial_conditions_tensor = torch.tensor(
+                initial_states_df[initial_m_cols + initial_r_cols].values, 
+                dtype=torch.float32, 
+                device=args.device
+            )
+        else:
+            print(f"Warning: Model {args.model} not yet supported for learned model simulation")
+            return
+        
+        print(f"Extracted {len(initial_conditions_tensor)} initial conditions")
+        
+        # Create batches
+        initial_condition_batches = split_into_batches(initial_conditions_tensor, args.simulation_batch_size)
+        batched_inputs = [(args, batch) for batch in initial_condition_batches]
+        
+        # Simulate with each learned method
+        if "implicit" in self.config.methods and models_exist(args.folder_name, "implicit"):
+            print("\n>>> Simulating with learned implicit model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_implicit, batched_inputs)
+                else:
+                    dfs = [simulate_batch_implicit(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_implicit.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating implicit: {e}")
+        
+        if "soft" in self.config.methods and models_exist(args.folder_name, "soft"):
+            print("\n>>> Simulating with learned soft model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_soft, batched_inputs)
+                else:
+                    dfs = [simulate_batch_soft(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_soft.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating soft: {e}")
+        
+        if "without" in self.config.methods and models_exist(args.folder_name, "without"):
+            print("\n>>> Simulating with learned without model")
+            try:
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
+                        dfs = pool.map(simulate_batch_without, batched_inputs)
+                else:
+                    dfs = [simulate_batch_without(x) for x in batched_inputs]
+                
+                if dfs and len(dfs) > 0:
+                    total_df = pd.concat(dfs, ignore_index=True)
+                    output_path = Path(args.folder_name) / "data" / "learned_without.xyz"
+                    save_simulation(total_df, str(output_path))
+                    print(f"    Saved to: {output_path}")
+                    gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+            except Exception as e:
+                print(f"    Error simulating without: {e}")
+    
+    def run(self):
+        """Run the full comparison."""
+        import gc
+        
+        print("=" * 70)
+        print("COMPARISON RUNNER - Pure Python")
+        print("=" * 70)
+        
+        # Convert config to namespace for backward compatibility
+        args = self.config.to_namespace()
+        
+        # Auto-compute dt if 0.0
+        if args.dt <= 0.0:
+            args.dt = resolve_automatic_dt(args)
+            self.config.dt = args.dt
+        
+        # Generate or load trajectories
+        print("\n" + "-" * 70)
+        print("Preparing trajectories (generating, loading, or simulating GT)")
+        print("-" * 70)
+        start_time = time.time()
+        generate_trajectories(args)
+        end_time = time.time()
+        print(f"Time: {end_time - start_time:.2f} seconds")
+        
+        # Clear memory after trajectory generation
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
+        # Train learners for each method
+        if "implicit" in self.config.methods:
+            print("\n" + "-" * 70)
+            print("Training: Implicit Jacobi")
+            print("-" * 70)
+            learner = self._get_learner("implicit")
+            learner.learn(
+                method="implicit",
+                learning_rate=self.config.lr,
+                epochs=self.config.epochs,
+                prefactor=self.config.prefactor
+            )
+            del learner
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        if "soft" in self.config.methods:
+            print("\n" + "-" * 70)
+            print("Training: Soft Jacobi")
+            print("-" * 70)
+            learner = self._get_learner("soft")
+            learner.learn(
+                method="soft",
+                learning_rate=self.config.lr,
+                epochs=self.config.epochs,
+                prefactor=self.config.prefactor,
+                jac_prefactor=self.config.jac_prefactor
+            )
+            del learner
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        if "without" in self.config.methods:
+            print("\n" + "-" * 70)
+            print("Training: Without Jacobi")
+            print("-" * 70)
+            learner = self._get_learner("without")
+            learner.learn(
+                method="without",
+                learning_rate=self.config.lr,
+                epochs=self.config.epochs,
+                prefactor=self.config.prefactor
+            )
+            del learner
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        # Simulate with learned models after training
+        print("\n" + "-" * 70)
+        print("Simulating learned models")
+        print("-" * 70)
+        self._simulate_learned_models(args)
+        
+        # Plot results
+        if not self.config.no_show:
+            print("\n" + "-" * 70)
+            print("Plotting training errors")
+            print("-" * 70)
+            plot_training_errors(args)
+        
+        print("\n" + "=" * 70)
+        print("COMPARISON COMPLETE")
+        print("=" * 70)
 
 
 def norm(x, y, z):
@@ -98,20 +546,29 @@ def run_simulation(sim_func, argss, use_multiprocessing):
         dfs = [sim_func(args) for args in argss]
     return dfs
 
+def models_exist(folder_name, method):
+    """Check if saved models exist for a given method."""
+    model_path = Path(folder_name) / "saved_models" / f"{method}_jacobi_energy"
+    return model_path.exists()
+
+
 def generate_trajectories(args):
     """
-    The function `generate_trajectories` generates and saves trajectories based on the given arguments, either using a deterministic approach or simulating with learned models.
+    The function `generate_trajectories` generates and saves trajectories based on the given arguments, either using a deterministic approach or simulating with learned models, or loads external data.
     
     :param args: The `args` parameter is a dictionary or object that contains various arguments or parameters for the `generate_trajectories` function. These arguments control the behavior of the function and determine what kind of trajectories are generated or simulated
     """
-    if args.generate:
+    total_generalization_data_frame = None
+    if args.external_data:
+        print(f"Loading external dataset from: {args.external_data}")
+        total_generalization_data_frame = pd.read_csv(args.external_data, dtype=np.float32)
+        # Save the external data to the default dataset path so Learner can find it
+        save_simulation(total_generalization_data_frame, args.folder_name+"/"+DEFAULT_dataset)
+    elif args.generate:
         print("Generating dataset.")
         #Now we generage initial conditions (deterministic)
         np.random.seed(args.seed)
-
         initial_conditions = generate_initial_conditions(args, device=args.device)
-        # initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_generate.csv", device=args.device)
-        
         initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
         batched_inputs = [(args, batch) for batch in initial_condition_batches]
 
@@ -128,25 +585,18 @@ def generate_trajectories(args):
         #save to file
         save_simulation(total_data_frame, args.folder_name+"/"+DEFAULT_dataset)
         print("Generated trajectories saved to: ", args.folder_name+"/"+DEFAULT_dataset)
-
-    else: #simulating with the learned models
+        total_generalization_data_frame = total_data_frame # Use generated data as GT
+    else: #simulating with the learned models, first generate GT if not external data
         multiprocessing = args.multiprocessing
-
-        total_implicit_data_frame = None
-        total_soft_data_frame = None
-        total_without_data_frame = None
-        total_generalization_data_frame = None
-        np.random.seed(args.seed+100*args.sampling) #new seed, safely beyond the last used value
-
         print("-------------------------------")
         print("Simulating with learned models.")    
         print("-------------------------------")
 
         #GT
-        print("Generating GT.")
+        print("Generating GT for comparison.")
 
+        np.random.seed(args.seed+100*args.sampling) #new seed, safely beyond the last used value
         initial_conditions = generate_initial_conditions(args, device=args.device)
-        #initial_conditions = load_initial_conditions(args.folder_name+"/initial_conditions_test.csv", device=args.device)
 
         initial_condition_batches = split_into_batches(initial_conditions, args.simulation_batch_size)
  
@@ -160,60 +610,130 @@ def generate_trajectories(args):
             dfs = [simulate_batch_normal(x) for x in batched_inputs]
 
         total_generalization_data_frame = pd.concat(dfs, ignore_index=True)
-
-        if args.implicit:
-            print("Simulating with learned implicit.")
-            if args.multiprocessing:
-                ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_implicit, batched_inputs)
-            else:
-                dfs = [simulate_batch_implicit(x) for x in batched_inputs]
-            total_implicit_data_frame = pd.concat(dfs, ignore_index=True)
-
-        if args.soft:
-            print("Simulating with learned soft.")
-            if args.multiprocessing:
-                ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_soft, batched_inputs)
-            else:
-                dfs = [simulate_batch_soft(x) for x in batched_inputs]
-            total_soft_data_frame = pd.concat(dfs, ignore_index=True)
-
-        if args.without:
-            print("Simulating with learned without.")
-            if args.multiprocessing:
-                ctx = mp.get_context('spawn')
-                with ctx.Pool(processes=min(3, len(batched_inputs))) as pool:
-                    dfs = pool.map(simulate_batch_without, batched_inputs)
-            else:
-                dfs = [simulate_batch_without(x) for x in batched_inputs]
-            total_without_data_frame = pd.concat(dfs, ignore_index=True)
-
-        #    %if (args.points >= 10) and ((i % int(round(args.points/10))) == 0):
-        #        print((i+0.0)/args.points*100, "%")
-
-        #save to file
-        if args.implicit:
-            save_simulation(total_implicit_data_frame, args.folder_name+"/data/learned_implicit.xyz") 
-        if args.soft:
-            save_simulation(total_soft_data_frame, args.folder_name+"/data/learned_soft.xyz") 
-        if args.without:
-            save_simulation(total_without_data_frame, args.folder_name+"/data/learned_without.xyz") 
         save_simulation(total_generalization_data_frame, args.folder_name+"/data/generalization.xyz")
-        
+
+    # Now simulate with learned models for comparison if needed
+    total_implicit_data_frame = None
+    total_soft_data_frame = None
+    total_without_data_frame = None
+
+    # These simulations will use the initial conditions that were either generated or from the external data for GT
+    # The initial_conditions for these simulations should come from the *first* states of total_generalization_data_frame
+    if total_generalization_data_frame is not None:
+        # Extract initial conditions from the loaded/generated GT data
+        # This assumes the GT data has columns like 'old_mx', 'old_my', 'old_mz', 'old_rx', 'old_ry', 'old_rz'
+        # which represent the initial state of each trajectory.
+        # This part might need adjustment based on the exact format of the external data.
+        if args.model == "RB":
+            initial_m_cols = ["old_mx", "old_my", "old_mz"]
+            initial_r_cols = [] # RB doesn't use r
+        elif args.model in ["HT", "P3D", "K3D"]:
+            initial_m_cols = ["old_mx", "old_my", "old_mz"]
+            initial_r_cols = ["old_rx", "old_ry", "old_rz"]
+        elif args.model == "P2D":
+            initial_m_cols = ["old_mx", "old_my"]
+            initial_r_cols = ["old_rx", "old_ry"]
+        elif args.model == "Sh": # Assuming 'u', 'x', 'y', 'z' for Shivamoggi as per dataset.py
+            initial_m_cols = ["old_u"] # u is like momentum here
+            initial_r_cols = ["old_x", "old_y", "old_z"]
+        elif args.model == "D":
+            initial_r_cols = [f"old_r{i}" for i in range(args.dimensions)]
+            initial_p_cols = [f"old_p{i}" for i in range(args.dimensions)]
+            initial_m_cols = initial_p_cols
+        else:
+            raise Exception("Unknown model for extracting initial conditions from GT data.")
+
+        # Get the unique initial conditions (the first row of each trajectory)
+        # Assuming that the 'time' column starts from 0 for each unique trajectory.
+        # We need to get the initial conditions for *all* trajectories, not just for a single batch.
+        # A simpler approach might be to store the initial_conditions in the args object if it's generated,
+        # or load them separately if they are from external data.
+        # For now, let's assume `total_generalization_data_frame` has a 'time' column and we want rows where time is 0.
+        initial_states_df = total_generalization_data_frame[total_generalization_data_frame['time'] == 0]
+
+        if args.model == "RB":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols].values, dtype=torch.float32, device=args.device)
+            # Pad with zeros for r, if the simulate_batch expects 6 dimensions
+            initial_conditions_for_learned = torch.cat([initial_conditions_for_learned, torch.zeros(initial_conditions_for_learned.shape[0], 3, device=args.device)], dim=1)
+        elif args.model == "Sh":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+        elif args.model in ["HT", "P3D", "K3D", "P2D"]:
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+        elif args.model == "D":
+            initial_conditions_for_learned = torch.tensor(initial_states_df[initial_m_cols + initial_r_cols].values, dtype=torch.float32, device=args.device)
+
+        initial_condition_batches_for_learned = split_into_batches(initial_conditions_for_learned, args.simulation_batch_size)
+        batched_inputs_for_learned = [(args, batch) for batch in initial_condition_batches_for_learned]
+
+        # Skip learned model simulation on --generate runs (models haven't been trained yet)
+        if args.generate:
+            print(">>> Skipping learned model simulation (--generate: models not trained yet)")
+        else:
+            if args.implicit and models_exist(args.folder_name, "implicit"):
+                print(">>> Simulating with learned implicit.")
+                print(f"    Loading models from: {args.folder_name}/saved_models/implicit_jacobi_*")
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                        print(f"    Starting multiprocessing pool with {min(3, len(batched_inputs_for_learned))} processes")
+                        dfs = pool.map(simulate_batch_implicit, batched_inputs_for_learned)
+                else:
+                    print(f"    Starting sequential simulation ({len(batched_inputs_for_learned)} batches)")
+                    dfs = [simulate_batch_implicit(x) for x in batched_inputs_for_learned]
+                print(f"    Concatenating {len(dfs)} dataframes...")
+                total_implicit_data_frame = pd.concat(dfs, ignore_index=True)
+                save_simulation(total_implicit_data_frame, args.folder_name+"/data/learned_implicit.xyz")
+                print(">>> Learned implicit simulation complete")
+
+            if args.soft and models_exist(args.folder_name, "soft"):
+                print(">>> Simulating with learned soft.")
+                print(f"    Loading models from: {args.folder_name}/saved_models/soft_jacobi_*")
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                        print(f"    Starting multiprocessing pool with {min(3, len(batched_inputs_for_learned))} processes")
+                        dfs = pool.map(simulate_batch_soft, batched_inputs_for_learned)
+                else:
+                    print(f"    Starting sequential simulation ({len(batched_inputs_for_learned)} batches)")
+                    dfs = [simulate_batch_soft(x) for x in batched_inputs_for_learned]
+                print(f"    Concatenating {len(dfs)} dataframes...")
+                total_soft_data_frame = pd.concat(dfs, ignore_index=True)
+                save_simulation(total_soft_data_frame, args.folder_name+"/data/learned_soft.xyz")
+                print(">>> Learned soft simulation complete")
+
+            if args.without and models_exist(args.folder_name, "without"):
+                print(">>> Simulating with learned without.")
+                print(f"    Loading models from: {args.folder_name}/saved_models/without_jacobi_*")
+                if args.multiprocessing:
+                    ctx = mp.get_context('spawn')
+                    with ctx.Pool(processes=min(3, len(batched_inputs_for_learned))) as pool:
+                        print(f"    Starting multiprocessing pool with {min(3, len(batched_inputs_for_learned))} processes")
+                        dfs = pool.map(simulate_batch_without, batched_inputs_for_learned)
+                else:
+                    print(f"    Starting sequential simulation ({len(batched_inputs_for_learned)} batches)")
+                    dfs = [simulate_batch_without(x) for x in batched_inputs_for_learned]
+                print(f"    Concatenating {len(dfs)} dataframes...")
+                total_without_data_frame = pd.concat(dfs, ignore_index=True)
+                save_simulation(total_without_data_frame, args.folder_name+"/data/learned_without.xyz")
+                print(">>> Learned without simulation complete")
+    else:
+        print("No generalization data available to simulate with learned models.")
+
+    # Always save the generalization data (either generated or loaded external data)
+    # The GT data is already saved to DEFAULT_dataset path earlier if generated or external.
+    # We also save it to 'generalization.xyz' for consistency in output.
+    if total_generalization_data_frame is not None:
+        save_simulation(total_generalization_data_frame, args.folder_name+"/data/generalization.xyz")
 
 def add_plot(ax, x=None,y=None, name=""):
     """
-    The function `add_plot` adds a line plot to a given matplotlib axes object, with the option to specify x and y data and a label for the plot.
+    The function `add_plot` adds a line plot to pyplot, with the option to specify x and y data and a label for the plot.
     
-    :param ax: The `ax` parameter is a matplotlib Axes object. It represents the subplot or axes on which the plot will be drawn
+    :param ax: The matplotlib.pyplot module (or axes object)
     :param x: The x-axis values for the plot. If provided, the plot will be a line plot with x and y values. If not provided, the plot will be a line plot with only y values
     :param y: The `y` parameter is a list or array of values that represent the y-coordinates of the data points to be plotted
     :param name: The name parameter is a string that represents the label for the plot. It is used to identify the plot in the legend of the graph
     """
-    #ax.scatter(x[::args.plot_every],y[::args.plot_every])
     if x is not None:
         ax.plot(x, y, lw=0.7, label=name)
     else:
@@ -223,9 +743,8 @@ def plot_training_errors(args):
     """
     The function `plot_training_errors` reads error data from CSV files and plots the training and validation errors for different scenarios.
     
-    :param args: The `args` parameter is an object that contains the following attributes:
-    """
-    print("***If Runtime tkinter errors are raised, it is because some matplotlib vs threads problems. Shouldn't be serious.***")
+    :param args: The `args` parameter is an object that contains the following attributes:\n    """
+    print("***If Runtime tkinter errors are raised, it is because some matplotlib vs threads problems. Shouldn\'t be serious.***")
 
     name = args.folder_name
     if args.soft:
@@ -302,190 +821,152 @@ def resolve_automatic_dt(args):
 # the numerical scheme, model, number of simulation steps, initial momentum and position values,
 # potential magnitude, and more.
 def main():
-    """Main entry point for comparison script."""
-    #Parse arguments
-    #Typical usage: comparison --generate --steps=100 --implicit --soft --without
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--scheme", default="IMR", type=str, help="Numerical scheme. FE forward euler, BE backward euler, CN Crank-Nicholson, Eh Ehrenfest")
-    parser.add_argument("--model", default="RB", type=str, help="Model: RB, HT, P3D, K3D, P2D or D.")
+    """
+    Pure Python main entry point for comparison script.
+    
+    Supports CLI via argparse for backward compatibility, but uses
+    ComparisonRunner internally for clean code.
+    """
+    parser = argparse.ArgumentParser(
+        description="Compare different Poisson structure learning methods"
+    )
+    # Model and simulation
+    parser.add_argument("--model", default="RB", type=str, help="Model: RB, HT, P3D, K3D, P2D or D")
     parser.add_argument("--steps", default=100, type=int, help="Number of simulation steps")
-    parser.add_argument("--init_mx", default=10.0, type=float, help="A value of momentum, x component")
-    parser.add_argument("--init_my", default=3.0, type=float, help="A value of momentum, y component") 
-    parser.add_argument("--init_mz", default=4.0, type=float, help="A value momentum, z component")
-    parser.add_argument("--Mgl", default=9.81*0.1, type=float, help="M*g*l")
-    parser.add_argument("--init_rx", default=1.0, type=float, help="Initial r, x component")
-    parser.add_argument("--init_ry", default=-3.0, type=float, help="Initial r, y component")
-    parser.add_argument("--init_rz", default=10.0, type=float, help="Initial r, z component")
-    parser.add_argument("--Ix", default=10.0, type=float, help="Ix")
-    parser.add_argument("--Iy", default=20.0, type=float, help="Iy")
-    parser.add_argument("--Iz", default=40.0, type=float, help="Iz")
-    parser.add_argument("--dt", default=0.0, type=float, help="Timestep, 0.0 for automatic")
-    parser.add_argument("--alpha", default=2.0, type=float, help="Potential magnitude or tau prefactor.")
-    parser.add_argument("--implicit", default=False, action="store_true", help="Use implicit Jacobi.")
-    parser.add_argument("--soft", default=False, action="store_true", help="Use soft Jacobi.")
-    parser.add_argument("--without", default=False, action="store_true", help="Use no Jacobi.")
-    parser.add_argument("--normalise", default=False, action="store_true", help="Normalise energy matrix at the end")
-    parser.add_argument("--generate", default=False, action="store_true", help="Generate new trajectories.")
-    parser.add_argument("--verbose", default=False, action="store_true", help="Print a lot of useful output")
-    parser.add_argument("--no_show", default=False, action="store_true", help="Don't show the training errors.")
-    parser.add_argument("--sampling", default=100, type=int, help="Approximate number of points to be sampled on the sphere.")
-    parser.add_argument("--points", default=100, type=int, help="Number of points on the sphere for generalization.")
+    parser.add_argument("--scheme", default="IMR", type=str, help="Integration scheme: IMR, RK4, etc.")
+    
+    # Methods to compare
+    parser.add_argument("--implicit", action="store_true", help="Include implicit Jacobi method")
+    parser.add_argument("--soft", action="store_true", help="Include soft Jacobi method")
+    parser.add_argument("--without", action="store_true", help="Include without Jacobi method")
+    
+    # Initial conditions
+    parser.add_argument("--init_mx", default=10.0, type=float, help="Initial momentum x")
+    parser.add_argument("--init_my", default=3.0, type=float, help="Initial momentum y")
+    parser.add_argument("--init_mz", default=4.0, type=float, help="Initial momentum z")
+    parser.add_argument("--init_rx", default=1.0, type=float, help="Initial position x")
+    parser.add_argument("--init_ry", default=-3.0, type=float, help="Initial position y")
+    parser.add_argument("--init_rz", default=10.0, type=float, help="Initial position z")
+    
+    # Model parameters
+    parser.add_argument("--Ix", default=10.0, type=float, help="Moment of inertia Ix")
+    parser.add_argument("--Iy", default=20.0, type=float, help="Moment of inertia Iy")
+    parser.add_argument("--Iz", default=40.0, type=float, help="Moment of inertia Iz")
+    parser.add_argument("--Mgl", default=9.81*0.1, type=float, help="M*g*l parameter")
+    parser.add_argument("--M_tau", default=0.0, type=float, help="Energy regularization parameter")
+    parser.add_argument("--M", default=0.5, type=float, help="Mass")
+    
+    # Learning parameters
+    parser.add_argument("--neurons", default=64, type=int, help="Number of neurons")
+    parser.add_argument("--layers", default=2, type=int, help="Number of layers")
+    parser.add_argument("--batch_size", default=32, type=int, help="Batch size")
+    parser.add_argument("--dt", default=0.0, type=float, help="Timestep (0.0 = automatic)")
+    parser.add_argument("--alpha", default=2.0, type=float, help="Potential magnitude/tau prefactor")
+    parser.add_argument("--lr", default=0.001, type=float, help="Learning rate")
+    parser.add_argument("--epochs", default=60, type=int, help="Number of training epochs")
     parser.add_argument("--prefactor", default=1.0, type=float, help="Loss prefactor")
-    parser.add_argument("--jac_prefactor", default=1.0, type=float, help="Loss prefactor for Jacobi identity")
-    parser.add_argument("--epochs", default=60, type=int, help="Number of epochs for soft.")
-    parser.add_argument("--seed", default=42, type=int, help="Random seed.")
-    parser.add_argument("--theta_sampling", default=20, type=int, help="Number theta angles.")
-    parser.add_argument("--lr", default=0.001, type=float, help="Soft learning rate")
-    parser.add_argument("--batch_size", default=32, type=int, help="Batch size.")
-    parser.add_argument("--neurons", default=64, type=int, help="Number of neurons.")
-    parser.add_argument("--layers", default=2, type=int, help="Number of layers.")
-    parser.add_argument("--M", default=0.5, type=float, help="mass")
-    parser.add_argument("--folder_name", default=DEFAULT_folder_name, type=str, help="Folder name")
-    parser.add_argument("--cuda", default=False, action="store_true", help="Use CUDA (under construction).")
-    parser.add_argument("--zeta", default=0.0, type=float, help="Dissipation coefficient (NOT IMPLEMENTED)")
+    parser.add_argument("--jac_prefactor", default=1.0, type=float, help="Jacobi loss prefactor")
     parser.add_argument("--dropout_rate", default=0.3, type=float, help="Dropout rate")
-    parser.add_argument("--quad_features", default=False, action="store_true", help="Adds quadratic features")
-    parser.add_argument("--M_tau", default=0, type=float, help="Multiple of dt used for energy regularisation for training dataset and GT.")
-    parser.add_argument("--multiprocessing", default=False, action="store_true", help="Use multiprocessing for simulation.")
-    parser.add_argument("--simulation_batch_size", default=256, type=int, help="Batch size for simulation.")
-    parser.add_argument("--no_data_to_gpu", default=True, action="store_false", help="Only move data to GPU while training.")
-    parser.add_argument("--dimensions", default=10, type=int, help="The spatial dimension of the particle system 'D'.")
-    parser.add_argument("--const_L", default=False, action="store_true", help="Whether to use a constant L matrix.")
+    parser.add_argument("--quad_features", action="store_true", help="Add quadratic features")
+    parser.add_argument("--const_L", action="store_true", help="Use constant L matrix")
+    
+    # Data
+    parser.add_argument("--generate", action="store_true", help="Generate new trajectories")
+    parser.add_argument("--external_data", default=None, type=str, help="Path to external data CSV")
+    parser.add_argument("--external_data_simple_format", action="store_true", help="Use simple format for external data")
+    parser.add_argument("--sampling", default=100, type=int, help="Sampling points")
+    parser.add_argument("--points", default=100, type=int, help="Points for generalization")
+    parser.add_argument("--seed", default=42, type=int, help="Random seed")
+    
+    # Jacobi loss
     parser.add_argument("--jacobi_loss_mode", default=DEFAULT_jacobi_loss_mode, type=str,
                         choices=["manual", "exact", "exact_backward", "hutchinson", "hutchinson_batch", "spectral"],
-                        help="Jacobi loss evaluation: exact or Hutchinson estimator")
+                        help="Jacobi loss evaluation mode")
     parser.add_argument("--hutchinson_samples", default=DEFAULT_hutchinson_samples, type=int,
-                        help="Number of Hutchinson probe vectors for Jacobi loss")
-
-    args = parser.parse_args([] if "__file__" not in globals() else None)
-
-    if args.dt == 0.0: #automatic
-        args.dt = resolve_automatic_dt(args)
-
-    check_folder(args.folder_name) #check whether the folders data and saved_models exist, or create them
-
-    #save args to file
-    original_stdout = sys.stdout
-    with open(args.folder_name+'/args.txt', 'w') as f:
-        sys.stdout = f # Change the standard output to the file we created.
-        print(args)
-        sys.stdout = original_stdout
-
-    if args.implicit and args.model in ["HT", "P3D", "K3D", "P2D", "Sh", "D"]:
-        raise Exception(f"Implicit solver not yet implemented for {args.model}.")
+                        help="Hutchinson probe vectors")
     
-    if args.model == "K3D" and args.scheme != "IMR":
-        raise Exception("Don't use CN for Kepler.")
-
-    if args.model in ("P2D", "Sh") and args.scheme != "IMR":
-        raise Exception(f"Only use the IMR scheme for {args.model}.")
+    # Misc
+    parser.add_argument("--folder_name", default=DEFAULT_folder_name, type=str, help="Output folder")
+    parser.add_argument("--cuda", action="store_true", help="Use CUDA if available")
+    parser.add_argument("--multiprocessing", action="store_true", help="Use multiprocessing")
+    parser.add_argument("--simulation_batch_size", default=256, type=int, help="Simulation batch size")
+    parser.add_argument("--no_data_to_gpu", action="store_true", help="Don't move data to GPU")
+    parser.add_argument("--dimensions", default=10, type=int, help="Dimension for generic particle system")
+    parser.add_argument("--zeta", default=0.0, type=float, help="Dissipation coefficient")
+    parser.add_argument("--verbose", action="store_true", help="Verbose output")
+    parser.add_argument("--no_show", action="store_true", help="Don't show plots")
+    parser.add_argument("--theta_sampling", default=20, type=int, help="Theta sampling")
     
-    if (args.implicit or args.soft) and args.const_L:
-        raise Exception("Only use constant L with the without method.")
-
-    if args.cuda and torch.cuda.is_available():
-        args.device = torch.device("cuda")
-        print(f"Using GPU: {torch.cuda.get_device_name()}")
-    else:
-        args.device = torch.device("cpu")
-        args.no_data_to_gpu = False
-        print("Using CPU")
-
-    if args.generate:
-        print("-------------------------------")
-        print("Generating trajectories.")    
-        print("-------------------------------")
-        generate_trajectories(args)
-        args.generate = False
-
-    dissipative = False if (args.zeta == 0) else True
+    args = parser.parse_args()
+    
+    # Collect methods
+    methods = []
     if args.implicit:
-        print("-------------------------------")
-        print("Learning implicit Jacobi.")    
-        print("-------------------------------")
-        if args.scheme == "IMR":
-            learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        elif args.scheme == "RK4":
-            learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        else:
-            learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                            dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                            dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                            simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-            
-        learner.learn(method = "implicit", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
-    
+        methods.append("implicit")
     if args.soft:
-        print("-------------------------------")
-        print("Learning soft Jacobi.")    
-        print("-------------------------------")
-        if args.scheme == "IMR":
-            learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, 
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        elif args.scheme == "RK4":
-            learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, 
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        else:
-            learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                            dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                            dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                            simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                            D=args.dimensions, 
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        learner.learn(method = "soft", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor, jac_prefactor = args.jac_prefactor)
+        methods.append("soft")
     if args.without:
-        print("-------------------------------")
-        print("Learning without Jacobi.")    
-        print("-------------------------------")
-        if args.scheme == "IMR":
-            learner = LearnerIMR(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, use_constant_L=args.const_L,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        elif args.scheme == "RK4":
-            learner = LearnerRK4(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                                dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                                dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                                simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                                D=args.dimensions, use_constant_L=args.const_L,
-                                jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        else:
-            learner = Learner(model=args.model, neurons = args.neurons, layers = args.layers, batch_size = args.batch_size,
-                            dt = args.dt, name = args.folder_name, device = args.device, dissipative = dissipative,
-                            dropout_rate = args.dropout_rate, quad_features=args.quad_features,
-                            simulation_batch_size=args.simulation_batch_size, no_data_to_gpu=args.no_data_to_gpu,
-                            D=args.dimensions, use_constant_L=args.const_L,
-                            jacobi_loss_mode=args.jacobi_loss_mode, hutchinson_samples=args.hutchinson_samples)
-        learner.learn(method = "without", learning_rate = args.lr, epochs = args.epochs, prefactor = args.prefactor)
-    if not args.no_show:
-        plot_training_errors(args)
-
-    import time
-    start_time = time.time()
-    generate_trajectories(args)
-    end_time = time.time()
-    print(f"generate_trajectories runtime: {end_time - start_time:.2f} seconds")
+        methods.append("without")
+    
+    # Default to all methods if none specified
+    if not methods:
+        methods = ["implicit", "soft", "without"]
+    
+    # Create config
+    config = ComparisonConfig(
+        model=args.model,
+        steps=args.steps,
+        scheme=args.scheme,
+        methods=methods,
+        init_mx=args.init_mx,
+        init_my=args.init_my,
+        init_mz=args.init_mz,
+        init_rx=args.init_rx,
+        init_ry=args.init_ry,
+        init_rz=args.init_rz,
+        Ix=args.Ix,
+        Iy=args.Iy,
+        Iz=args.Iz,
+        Mgl=args.Mgl,
+        M_tau=args.M_tau,
+        M=args.M,
+        neurons=args.neurons,
+        layers=args.layers,
+        batch_size=args.batch_size,
+        dt=args.dt,
+        alpha=args.alpha,
+        lr=args.lr,
+        epochs=args.epochs,
+        prefactor=args.prefactor,
+        jac_prefactor=args.jac_prefactor,
+        dropout_rate=args.dropout_rate,
+        quad_features=args.quad_features,
+        const_L=args.const_L,
+        generate=args.generate,
+        external_data=args.external_data,
+        external_data_simple_format=args.external_data_simple_format,
+        sampling=args.sampling,
+        points=args.points,
+        seed=args.seed,
+        jacobi_loss_mode=args.jacobi_loss_mode,
+        hutchinson_samples=args.hutchinson_samples,
+        folder_name=args.folder_name,
+        cuda=args.cuda,
+        multiprocessing=args.multiprocessing,
+        simulation_batch_size=args.simulation_batch_size,
+        no_data_to_gpu=not args.no_data_to_gpu,  # Note: invert the flag
+        theta_sampling=args.theta_sampling,
+        dimensions=args.dimensions,
+        zeta=args.zeta,
+        verbose=args.verbose,
+        no_show=args.no_show,
+    )
+    
+    # Run comparison
+    runner = ComparisonRunner(config)
+    runner.run()
 
 
 if __name__ == "__main__":
     main()
-    
+

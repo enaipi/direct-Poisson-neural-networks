@@ -4,7 +4,7 @@ from scipy.optimize import fsolve
 import numpy as np
 import torch
 
-from .base import RigidBody
+from .rigid_body import RigidBody
 
 
 class RBEhrenfest(RigidBody):#Ehrenfest scheme for the rigid body, Eq. 5.25a from https://doi.org/10.1016/j.physd.2019.06.006, τ=dt
@@ -142,14 +142,16 @@ class RBIMR(RigidBody):#implicit midpoint
         m_old = torch.stack([self.mx, self.my, self.mz], dim=1)
         m_new = m_old.clone()
 
-        for _ in range(solver_iterations):
+        for iter_num in range(solver_iterations):
             m_prev = m_new.clone()
             m_mid = 0.5 * (m_old + m_prev)
             m_mid.requires_grad_(True)
 
             dot = (self.d2E @ m_mid.T).T
             hamiltonian = torch.cross(m_mid, dot, dim=1)
-            m_new = m_old + self.dt * hamiltonian
+            m_new_candidate = m_old + self.dt * hamiltonian
+
+            m_new = m_new_candidate
 
             diff = torch.norm(m_new - m_prev, dim=1)
             denom = torch.norm(m_prev, dim=1) + 1e-12
