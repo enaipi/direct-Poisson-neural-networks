@@ -3,7 +3,7 @@ QUICK START: Recover L and H from a Time Series
 
 This is a minimal, practical guide to:
 1. Load your time series data
-2. Train a learner
+2. Train a learner using the same rigid-body training path as example 01
 3. Extract the learned L(z) and H(z)
 4. Analyze learning quality with HamiltonianSystemAnalyzer
 
@@ -11,9 +11,23 @@ Run this file as:
     python 00_quickstart.py
 """
 
+import sys
 import torch
 import numpy as np
+import pandas as pd
 from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from dpnn.comparison import (
+    ComparisonConfig,
+    ComparisonRunner,
+    check_folder,
+    generate_trajectories,
+    resolve_automatic_dt,
+)
+from dpnn.training import DEFAULT_dataset
 
 # ============================================================================
 # STEP 1: PREPARE YOUR DATA
@@ -22,74 +36,104 @@ from pathlib import Path
 num_trajectories = 100
 num_steps = 100  # Longer trajectories for more data
 
+def rigid_body_generator_config():
+    """Create the rigid-body config used by example 01."""
+    return ComparisonConfig(
+        model="RB",
+        steps=num_steps,
+        methods=["soft"],
+        init_mx=10.0,
+        init_my=3.0,
+        init_mz=4.0,
+        Ix=10.0,
+        Iy=20.0,
+        Iz=40.0,
+        neurons=64,
+        layers=2,
+        batch_size=32,
+        epochs=10,
+        lr=0.001,
+        dropout_rate=0.3,
+        generate=True,
+        sampling=num_trajectories,
+        points=num_trajectories,
+        seed=42,
+        jacobi_loss_mode="spectral",
+        folder_name="/tmp/quickstart_rigid_body",
+        verbose=False,
+    )
+
+
+def reconstruct_rigid_body_trajectories(data_frame, steps_per_trajectory):
+    """
+    Convert the rigid-body generator's old/new transition rows into trajectories.
+
+    The comparison generator writes one row per transition:
+    (old_mx, old_my, old_mz) -> (mx, my, mz).
+    This quickstart works with full z(t) arrays, so each trajectory is rebuilt as
+    [old state from first row, then every new state].
+    """
+    rows_per_trajectory = steps_per_trajectory - 1
+    if len(data_frame) % rows_per_trajectory != 0:
+        raise ValueError(
+            f"Expected generated row count to be divisible by {rows_per_trajectory}, "
+            f"got {len(data_frame)}"
+        )
+
+    trajectories = []
+    old_cols = ["old_mx", "old_my", "old_mz"]
+    new_cols = ["mx", "my", "mz"]
+
+    for start in range(0, len(data_frame), rows_per_trajectory):
+        chunk = data_frame.iloc[start:start + rows_per_trajectory]
+        initial_state = chunk.iloc[0][old_cols].to_numpy(dtype=np.float32)
+        evolved_states = chunk[new_cols].to_numpy(dtype=np.float32)
+        trajectories.append(np.vstack([initial_state, evolved_states]))
+
+    return trajectories
+
+
 def prepare_data():
     """
     Prepare Hamiltonian time series data for learning.
     
-    Generates trajectories from a 2D harmonic oscillator:
-    - State: z = (q1, p1, q2, p2) where q=position, p=momentum
-    - Hamiltonian: H(z) = 0.5(p1^2 + p2^2) + 0.5(q1^2 + 4*q2^2)
-    - Dynamics: dz/dt = L @ ∇H where L is the symplectic structure
-    
-    This is a canonical Hamiltonian system that the learner can recover.
+    Reuses the rigid-body trajectory generator from example 01:
+    - State: z = (mx, my, mz), the angular momentum vector
+    - Hamiltonian: H(z) = 0.5(mx^2/Ix + my^2/Iy + mz^2/Iz)
+    - Dynamics: dz/dt = L(z) @ ∇H where L(z) is the rigid-body
+      Lie-Poisson structure
     """
-    
-    dim = 4  # 4D: q1, p1, q2, p2
-    dt = 0.001  # Very small time step for numerical stability
-    
-    # Generate multiple trajectories with different initial conditions
-    trajectories = []
-    for traj_idx in range(num_trajectories):  # More trajectories
-        # Initial conditions: energy-limited (not too large)
-        q1_0 = 1.0 + 0.3 * traj_idx
-        p1_0 = 0.8 + 0.2 * traj_idx
-        q2_0 = 0.5 - 0.15 * traj_idx
-        p2_0 = 0.6 + 0.1 * traj_idx
-        
-        z = np.zeros((num_steps, dim))
-        z[0] = [q1_0, p1_0, q2_0, p2_0]
-        
-        # Integrate using symplectic Stormer-Verlet integrator (better structure preservation)
-        # This is more stable and better for learning Hamiltonian structure
-        for step in range(num_steps - 1):
-            q1, p1, q2, p2 = z[step]
-            
-            # Half-step momentum update: p = p + 0.5*dt*(-∇V)
-            # where ∇V = (q1, 0, 4*q2, 0) for V = 0.5*q1^2 + 0.5*4*q2^2
-            p1 = p1 - 0.5 * dt * q1
-            p2 = p2 - 0.5 * dt * 4 * q2
-            
-            # Full-step position update: q = q + dt*p (kinetic energy coefficient = 1)
-            q1 = q1 + dt * p1
-            q2 = q2 + dt * p2
-            
-            # Half-step momentum update
-            p1 = p1 - 0.5 * dt * q1
-            p2 = p2 - 0.5 * dt * 4 * q2
-            
-            z[step + 1] = [q1, p1, q2, p2]
-        
-        trajectories.append(z)
-    
-    # Concatenate all trajectories
+
+    dim = 3  # 3D: mx, my, mz
+    config = rigid_body_generator_config()
+    args = config.to_namespace()
+    args.methods = []
+    args.implicit = False
+    args.soft = False
+    args.without = False
+
+    if args.dt <= 0.0:
+        args.dt = resolve_automatic_dt(args)
+        config.dt = args.dt
+
+    check_folder(config.folder_name)
+    generate_trajectories(args)
+
+    generated_path = Path(config.folder_name) / DEFAULT_dataset
+    generated_data = pd.read_csv(generated_path, dtype=np.float32)
+    trajectories = reconstruct_rigid_body_trajectories(generated_data, num_steps)
     z_timeseries = np.concatenate(trajectories, axis=0)
-    
-    # Normalize to reasonable scale (helps with learning)
-    z_mean = np.mean(z_timeseries, axis=0)
-    z_std = np.std(z_timeseries, axis=0)
-    z_std = np.where(z_std < 1e-6, 1.0, z_std)  # Avoid division by near-zero
-    z_timeseries = (z_timeseries - z_mean) / z_std
-    
-    print(f"Generated Hamiltonian trajectories:")
+
+    print(f"Generated rigid-body Hamiltonian trajectories:")
     print(f"  Shape: {z_timeseries.shape}")
     print(f"  States per trajectory: {num_steps}")
-    print(f"  Number of trajectories: {num_trajectories}")
-    print(f"  State dimension: {dim} (q1, p1, q2, p2)")
-    print(f"  Time step: {dt}")
-    print(f"  System: 2D Harmonic Oscillator (canonical Hamiltonian)")
-    print(f"  Data normalized - Mean: {z_mean}, Std: {z_std}")
-    
-    return z_timeseries, dim, dt
+    print(f"  Number of trajectories: {len(trajectories)}")
+    print(f"  State dimension: {dim} (mx, my, mz)")
+    print(f"  Time step: {config.dt}")
+    print(f"  System: Rigid Body (same generator as example 01)")
+    print(f"  Generated data source: {generated_path}")
+
+    return z_timeseries, dim, config.dt
 
 
 # ============================================================================
@@ -106,7 +150,7 @@ def convert_to_standard_format(z_timeseries, dim, dt):
     import json
     
     # Split concatenated trajectories back into individual trajectories
-    # (Each trajectory has ~2000 steps)
+    # (Each trajectory has num_steps states)
     num_steps_per_traj = len(z_timeseries) // num_trajectories
     trajectories = [
         z_timeseries[i*num_steps_per_traj:(i+1)*num_steps_per_traj]
@@ -116,11 +160,11 @@ def convert_to_standard_format(z_timeseries, dim, dt):
     # Create standard JSON structure
     data = {
         "metadata": {
-            "system_name": "HarmonicOscillator2D",
+            "system_name": "RigidBody",
             "dimension": dim,
             "dt": dt,
             "num_trajectories": len(trajectories),
-            "units": {"state": "canonical (q,p)", "time": "s"}
+            "units": {"state": "angular momentum", "time": "s"}
         },
         "trajectories": [
             {
@@ -146,77 +190,45 @@ def convert_to_standard_format(z_timeseries, dim, dt):
 # STEP 3: CREATE A LEARNER AND TRAIN
 # ============================================================================
 
-def train_model(data_path, dim, method="soft", epochs=20):
+def train_model(config, method="soft", epochs=None):
     """
-    Train a learner to recover L and H from data using HamiltonianLearner.
+    Train a learner to recover L and H using example 01's training path.
     
     Args:
-        data_path: Path to the standard JSON file
-        dim: Dimension of the system
+        config: Rigid-body comparison config pointing at generated data
         method: "without" (baseline), "soft" (with Jacobi), "implicit" (IMR only)
-        epochs: Number of training epochs
+        epochs: Optional override for the number of training epochs
     
     Returns:
         learner: Trained HamiltonianLearner object
     """
-    from dpnn.training.hamiltonian_learner import HamiltonianLearner
-    from dpnn.system_spec import SystemSpec
-    from dpnn.data.dataset import TrajectoryDataset
-    
-    print(f"\nTraining learner (method={method}, jacobi_mode=spectral, epochs={epochs})...")
-    
-    # Create generic system spec for this dimension to avoid legacy data loading
-    system_spec = SystemSpec.custom(
-        name=f"Generic_{dim}D",
-        dimension=dim,
-        description=f"Generic {dim}-dimensional system from standard JSON"
-    )
-    
-    # Initialize learner with system spec (bypasses legacy data loading)
-    device = torch.device('cpu')
-    batch_size = 8  # Small batches for stable training
-    
-    learner = HamiltonianLearner(
-        system_spec=system_spec,
-        batch_size=batch_size,
-        neurons=128,        # Larger network for better fitting
-        layers=3,           # More layers for complexity
-        device=device,
-        dropout_rate=0.02,  # Very low dropout for small dataset
-        jacobi_loss_mode="spectral",  # Use spectral Jacobi constraint
-        integration_scheme="imr",      # Implicit midpoint rule
-        use_constant_L=False,           # Learn L(z) from data
-        verbose=False
-    )
-    
-    # Load data from standard JSON
-    dataset = TrajectoryDataset.from_standard_json(data_path)
-    
-    # Create data loaders with same batch size
-    train_size = int(0.8 * len(dataset))
-    val_size = len(dataset) - train_size
-    train_data, val_data = torch.utils.data.random_split(
-        dataset, [train_size, val_size]
-    )
-    
-    learner.train_loader = torch.utils.data.DataLoader(
-        train_data, batch_size=batch_size, shuffle=True
-    )
-    learner.valid_loader = torch.utils.data.DataLoader(
-        val_data, batch_size=batch_size, shuffle=False
-    )
-    
-    print(f"  Train samples: {len(train_data)}, Val samples: {len(val_data)}")
-    print(f"  Batch size: {batch_size}")
-    print(f"  Network: {128} neurons × 3 layers")
-    
-    # Train using HamiltonianLearner.learn() API
+    if epochs is not None:
+        config.epochs = epochs
+
+    if config.dt <= 0.0:
+        args = config.to_namespace()
+        config.dt = resolve_automatic_dt(args)
+
+    config.methods = [method]
+    runner = ComparisonRunner(config)
+    learner = runner._get_learner(method)
+
+    print(f"\nTraining learner with example 01 approach:")
+    print(f"  Model: {config.model}")
+    print(f"  Data: {config.folder_name}/{DEFAULT_dataset}")
+    print(f"  Method: {method}")
+    print(f"  Epochs: {config.epochs}")
+    print(f"  Batch size: {config.batch_size}")
+    print(f"  Network: {config.neurons} neurons × {config.layers} layers")
+    print(f"  Learning rate: {config.lr}")
+    print(f"  Dropout: {config.dropout_rate}")
+
     learner.learn(
         method=method,
-        learning_rate=1e-4,     # Very small learning rate for small normalized data
-        epochs=epochs,
-        prefactor=0.5,          # Scale main loss (focus on Jacobi)
-        jac_prefactor=1.0       # High weight for Jacobi (critical for Hamiltonian structure)
+        learning_rate=config.lr,
+        epochs=config.epochs,
+        prefactor=config.prefactor,
+        jac_prefactor=config.jac_prefactor
     )
     
     print(f"✓ Training complete!")
@@ -356,16 +368,16 @@ def analyze_learned_model(learner, z_timeseries, dim, dt):
     # Create analyzer
     analyzer = HamiltonianSystemAnalyzer(
         dimension=dim,
-        system_name="HarmonicOscillator2D"
+        system_name="RigidBody"
     )
     
     # -----------------------------------------------------------------------
     # Split concatenated trajectories back into individual trajectories
     # -----------------------------------------------------------------------
-    num_steps_per_traj = len(z_timeseries) // 4
+    num_steps_per_traj = len(z_timeseries) // num_trajectories
     z_traj_list = [
         z_timeseries[i*num_steps_per_traj:(i+1)*num_steps_per_traj]
-        for i in range(4)
+        for i in range(num_trajectories)
     ]
     
     print(f"\nGenerating predictions for {len(z_traj_list)} trajectories...")
@@ -585,15 +597,17 @@ def main():
     # STEP 1: Prepare data
     z_timeseries, dim, dt = prepare_data()
     
-    # STEP 2: Convert to standard format
-    data_path = convert_to_standard_format(z_timeseries, dim, dt)
+    # STEP 2: Convert to standard format for users who want portable JSON data.
+    # Training below intentionally uses the generated .xyz file, matching example 01.
+    _data_path = convert_to_standard_format(z_timeseries, dim, dt)
     
-    # STEP 3: Train learner
+    # STEP 3: Train learner with the same approach as examples/01_rigid_body.py
+    training_config = rigid_body_generator_config()
+    training_config.dt = dt
     learner = train_model(
-        data_path, 
-        dim, 
+        training_config,
         method="soft",      # Use soft Jacobi constraint
-        epochs=50           # More epochs for Hamiltonian data
+        epochs=10           # Same default as example 01
     )
     
     # STEP 4: Extract learned functions
