@@ -1,110 +1,88 @@
 """
-EXAMPLE 4: Fermi-Pasta-Ulam Chain
-
-Generate trajectories for a 1D Fermi-Pasta-Ulam (FPU) chain and learn
-Hamiltonian dynamics from the generated time series.
-
-System: N-particle canonical Hamiltonian chain
-  State z = (q_0, ..., q_{N-1}, p_0, ..., p_{N-1})
-  Fixed boundaries: q_{-1} = q_N = 0
-  Energy H = kinetic + quadratic/cubic/quartic nearest-neighbor potential
+EXAMPLE 5: Harmonic Oscillator Particles
+ 
+Generate trajectories for N particles in D dimensions, each with an
+independent harmonic potential, and learn the Hamiltonian dynamics
+from the generated time series.
+ 
+System: N particles in D dimensions, canonical Hamiltonian, no coupling
+  State z = (q_0, ..., q_{N*D-1}, p_0, ..., p_{N*D-1})
+  Energy H = sum_i p_i^2 / (2M) + 1/2 k sum_i q_i^2
   Structure L = canonical symplectic Poisson matrix
-
+ 
 Run this file as:
-    python examples/04_fpu.py
+    python examples/05_harmonic.py
 """
 
-import json
 import sys
 from pathlib import Path
-
+ 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader, Dataset, random_split
-
+from torch.utils.data import DataLoader, random_split
+ 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
-from dpnn.models.physical_models import FPUIMR
+ 
+from dpnn.models.physical_models import HarmonicIMR
 from dpnn.system_spec import SystemSpec
 from dpnn.training.hamiltonian_learner import HamiltonianLearner
 
-from dpnn.utils._common import TransitionDataset, save_standard_json, save_transition_csv
+from dpnn.utils._common import TransitionDataset, save_transition_csv, save_standard_json
 
 
-STATE_DIMENSIONS = 8
+N_PARTICLES = 4
+DIMENSIONS = 2
+STATE_DIMENSIONS = N_PARTICLES * DIMENSIONS 
 NUM_TRAJECTORIES = 12
 STEPS_PER_TRAJECTORY = 200
 DT = 0.01
-OUTPUT_DIR = Path("examples_fpu")
+M = 1.0
+K = 1.0
+OUTPUT_DIR = Path("examples_harmonic")
 UNITS = {"position": "dimensionless", "momentum": "dimensionless", "time": "s"}
 
-
-class TransitionDataset(Dataset):
-    """Dataset of consecutive states z_n -> z_{n+1} for residual training."""
-
-    def __init__(self, trajectories):
-        features = []
-        targets = []
-        for trajectory in trajectories:
-            features.append(trajectory[:-1])
-            targets.append(trajectory[1:])
-
-        features = np.vstack(features).astype(np.float32)
-        targets = np.vstack(targets).astype(np.float32)
-
-        self.features = torch.from_numpy(features)
-        self.targets = torch.from_numpy(targets)
-        self.mid = 0.5 * (self.features + self.targets)
-
-    def __len__(self):
-        return self.features.shape[0]
-
-    def __getitem__(self, idx):
-        return self.features[idx], self.targets[idx], self.mid[idx]
+DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 
 def make_initial_conditions(num_trajectories, dimensions, seed=42):
-    """Create small-amplitude initial FPU states."""
     rng = np.random.default_rng(seed)
-    grid = np.arange(1, dimensions + 1, dtype=np.float32)
-    mode = np.sin(np.pi * grid / (dimensions + 1))
-
+ 
     initial_conditions = []
     for _ in range(num_trajectories):
-        amplitude = rng.uniform(0.08, 0.18)
-        q0 = amplitude * mode
-        q0 += rng.normal(0.0, 0.01, size=dimensions).astype(np.float32)
-        p0 = rng.normal(0.0, 0.02, size=dimensions).astype(np.float32)
+        amplitude = rng.uniform(0.3, 0.8, size=dimensions).astype(np.float32)
+        phase = rng.uniform(0.0, 2.0 * np.pi, size=dimensions).astype(np.float32)
+        q0 = amplitude * np.cos(phase)
+        p0 = -amplitude * np.sin(phase)
         initial_conditions.append((q0.astype(np.float32), p0.astype(np.float32)))
-
+ 
     return initial_conditions
 
 
-def simulate_fpu_trajectories():
-    """Generate FPU trajectories using the physical FPUIMR model."""
+def simulate_harmonic_trajectories():
+    """Generate harmonic oscillator trajectories using the physical HarmonicIMR model."""
     print("=" * 70)
-    print("EXAMPLE 4: FERMI-PASTA-ULAM CHAIN")
+    print("EXAMPLE 5: HARMONIC OSCILLATOR PARTICLES")
     print("=" * 70)
-
+ 
     data_dir = OUTPUT_DIR / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
-
+ 
     trajectories = []
     energies = []
     initial_conditions = make_initial_conditions(NUM_TRAJECTORIES, STATE_DIMENSIONS)
-
+ 
     for q0, p0 in initial_conditions:
-        model = FPUIMR(
-            M=1.0,
+        model = HarmonicIMR(
+            N=N_PARTICLES,
+            D=DIMENSIONS,
+            M=M,
             dt=DT,
-            alpha=0.25,
-            beta=1.0,
-            k=1.0,
+            k=K,
             init_q=q0,
             init_p=p0,
         )
-
+ 
         states = []
         energy_values = []
         for _ in range(STEPS_PER_TRAJECTORY):
@@ -112,56 +90,60 @@ def simulate_fpu_trajectories():
             states.append(z[0].detach().cpu().numpy().copy())
             energy_values.append(float(model.get_E(z)[0].detach().cpu()))
             model.m_new()
-
+ 
         trajectories.append(np.asarray(states, dtype=np.float32))
         energies.append(np.asarray(energy_values, dtype=np.float32))
-
-    save_standard_json(trajectories, data_dir, filename="fpu_data.json", system_name="FermiPastaUlam", 
-                       dt=DT, dimension=2 * STATE_DIMENSIONS, units=UNITS)
-    save_transition_csv(trajectories, data_dir, filename="fpu_transitions.csv", 
-                        dt=DT, component_dim=STATE_DIMENSIONS)
-
+ 
+    # labels "particle_idx"_"dimension"
+    component_labels = [f"{n}_{d}" for n in range(N_PARTICLES) for d in range(DIMENSIONS)]
+ 
+    save_standard_json(trajectories, data_dir, filename="harmonic_data.json",
+        system_name="HarmonicOscillatorParticles", dt=DT,
+        dimension=2 * STATE_DIMENSIONS, units=UNITS,)
+    save_transition_csv(trajectories, data_dir, filename="harmonic_transitions.csv",
+        dt=DT, component_dim=STATE_DIMENSIONS, component_labels=component_labels,)
+ 
     energy_array = np.vstack(energies)
     relative_energy_drift = np.max(
         np.abs(energy_array - energy_array[:, :1]) / np.maximum(np.abs(energy_array[:, :1]), 1e-12)
     )
-
-    print("Generated FPU trajectories:")
+ 
+    print("Generated harmonic oscillator trajectories:")
     print(f"  Shape: {np.asarray(trajectories).shape}")
-    print(f"  Chain particles: {STATE_DIMENSIONS}")
+    print(f"  Particles: {N_PARTICLES}, Dimensions: {DIMENSIONS}")
     print(f"  State dimension: {2 * STATE_DIMENSIONS}")
     print(f"  Time step: {DT}")
     print(f"  Max relative energy drift: {relative_energy_drift:.3e}")
-    print(f"  Standard JSON: {data_dir / 'fpu_data.json'}")
-    print(f"  Transition CSV: {data_dir / 'fpu_transitions.csv'}")
-
+    print(f"  Standard JSON: {data_dir / 'harmonic_data.json'}")
+    print(f"  Transition CSV: {data_dir / 'harmonic_transitions.csv'}")
+ 
     return trajectories
 
 
-def train_fpu_learner(trajectories, epochs=5):
-    """Train a generic HamiltonianLearner on FPU transition pairs."""
+def train_harmonic_learner(trajectories, epochs=5):
+    """Train a generic HamiltonianLearner on harmonic oscillator transition pairs."""
     system_spec = SystemSpec.custom(
-        name="FermiPastaUlam",
+        name="HarmonicOscillatorParticles",
         dimension=2 * STATE_DIMENSIONS,
         structure_tensor="symplectic",
         poisson_bracket_type="canonical",
         conserved_quantities=["energy"],
-        description="FPU chain in canonical q,p coordinates",
-        units={"position": "dimensionless", "momentum": "dimensionless", "time": "s"},
+        description="N particles in D dimensions, independent harmonic potential, canonical q,p coordinates",
+        units=UNITS,
     )
-
-    dataset = TransitionDataset(trajectories)
+ 
+    dataset = TransitionDataset(trajectories, DEVICE)
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
     train_data, val_data = random_split(dataset, [train_size, val_size])
-
+ 
     learner = HamiltonianLearner(
         system_spec=system_spec,
         batch_size=32,
         neurons=64,
         layers=2,
         dt=DT,
-        device=torch.device("cpu"),
+        device=DEVICE,
         dropout_rate=0.1,
         jacobi_loss_mode="spectral",
         integration_scheme="imr",
@@ -170,13 +152,13 @@ def train_fpu_learner(trajectories, epochs=5):
     )
     learner.train_loader = DataLoader(train_data, batch_size=32, shuffle=True)
     learner.valid_loader = DataLoader(val_data, batch_size=32, shuffle=False)
-
-    print("\nTraining FPU learner:")
+ 
+    print("\nTraining harmonic learner:")
     print(f"  Train samples: {len(train_data)}")
     print(f"  Val samples: {len(val_data)}")
     print(f"  Epochs: {epochs}")
     print("  Method: soft")
-
+ 
     learner.learn(
         method="soft",
         learning_rate=1e-3,
@@ -184,17 +166,17 @@ def train_fpu_learner(trajectories, epochs=5):
         prefactor=1.0,
         jac_prefactor=1.0,
     )
-
+ 
     return learner
 
 
 def inspect_learned_model(learner):
     """Print a small sanity check for learned H(z), L(z), and z_dot."""
-    z = torch.randn(1, 2 * STATE_DIMENSIONS)
+    z = torch.randn(1, 2 * STATE_DIMENSIONS, device=DEVICE)
     H = learner.energy(z)
     L = learner.forward_L_tensor(z)
     z_dot = learner.compute_z_dot(z)
-
+ 
     print("\nLearned function shapes:")
     print(f"  H(z): {tuple(H.shape)}")
     print(f"  L(z): {tuple(L.shape)}")
@@ -203,15 +185,15 @@ def inspect_learned_model(learner):
 
 
 def main():
-    trajectories = simulate_fpu_trajectories()
-    learner = train_fpu_learner(trajectories)
+    trajectories = simulate_harmonic_trajectories()
+    learner = train_harmonic_learner(trajectories)
     inspect_learned_model(learner)
-
+ 
     print("\n" + "=" * 70)
     print("COMPLETE!")
     print("=" * 70)
     print(f"Results saved to: {OUTPUT_DIR}/")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()

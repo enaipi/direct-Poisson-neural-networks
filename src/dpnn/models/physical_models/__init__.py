@@ -56,6 +56,13 @@ from .shivamoggi_particlend import (
     ParticleNDCNNeural,
 )
 
+from .harmonic import (
+    HarmonicCN,
+    HarmonicIMR,
+    HarmonicNeural,
+    HarmonicNeuralIMR
+)
+
 __all__ = [
     # Generic infrastructure
     "GeneralSystem",
@@ -101,4 +108,10 @@ __all__ = [
     "ShivamoggiNeural",
     "ParticleNDCN",
     "ParticleNDCNNeural",
+
+    # Harmonic particles
+    "HarmonicCN",
+    "HarmonicIMR",
+    "HarmonicNeural",
+    "HarmonicNeuralIMR"
 ]
