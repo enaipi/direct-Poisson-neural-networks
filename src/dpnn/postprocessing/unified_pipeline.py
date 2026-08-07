@@ -137,8 +137,9 @@ def run_postprocessing_analysis(
                     print(f"    - Median: {method_results['trajectory_error']['median_error']:.6e}")
                     print(f"    - Max:    {method_results['trajectory_error']['max_error']:.6e}")
                     print(f"  Jacobi Identity Error:")
-                    print(f"    - Mean antisymmetry: {method_results['jacobi_error']['mean_antisymmetry_error']:.6e}")
-                    print(f"    - Max antisymmetry:  {method_results['jacobi_error']['max_antisymmetry_error']:.6e}")
+                    print(f"    - Mean Jacobi error: {method_results['jacobi_error']['mean_jacobi_identity_error']:.6e}")
+                    print(f"    - Max Jacobi error:  {method_results['jacobi_error']['max_jacobi_identity_error']:.6e}")
+                    print(f"    - Mean kernel rank:  {method_results['jacobi_error']['mean_kernel_rank']:.6e}")
                     if 'mean_eigenvalue_error' in method_results['jacobi_error']:
                         print(f"    - Eigenvalue purity: {method_results['jacobi_error']['mean_eigenvalue_error']:.6e}")
                 else:

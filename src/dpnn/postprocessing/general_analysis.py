@@ -45,6 +45,8 @@ def analyze_general_model_data(
     system_name: str = "General",
     analyzer: Optional[HamiltonianSystemAnalyzer] = None,
     verbose: bool = True,
+    learner=None,
+    state_samples=None,
 ):
     """Analyze learned trajectories and structure matrices directly from arrays."""
     if analyzer is None:
@@ -71,12 +73,25 @@ def analyze_general_model_data(
             print(f"  Error computing trajectory discrepancy: {exc}")
 
     try:
-        jacobi_results = analyzer.compute_jacobi_error(L_samples, method="spectral")
+        jacobi_loss_fn = getattr(learner, "jacobi_loss", None) if learner is not None else None
+        jacobi_results = analyzer.compute_jacobi_error(
+            L_samples,
+            method="spectral",
+            state_samples=state_samples,
+            jacobi_loss_fn=jacobi_loss_fn,
+        )
         analyzer.results["jacobi_error"] = jacobi_results
         if verbose:
-            print(f"  Antisymmetry error:  {jacobi_results['mean_antisymmetry_error']:.6e}")
-            if "max_antisymmetry_error" in jacobi_results:
-                print(f"  Max antisymmetry:    {jacobi_results['max_antisymmetry_error']:.6e}")
+            primary_jacobi_error = jacobi_results.get(
+                "mean_spectral_jacobi_loss",
+                jacobi_results.get("mean_jacobi_identity_error", np.nan),
+            )
+            print(f"  Jacobi identity error: {primary_jacobi_error:.6e}")
+            print(f"  Mean kernel rank:      {jacobi_results['mean_kernel_rank']:.6e}")
+            if "max_jacobi_identity_error" in jacobi_results:
+                print(f"  Max Jacobi error:      {jacobi_results['max_jacobi_identity_error']:.6e}")
+            if "spectral_jacobi_loss" in jacobi_results:
+                print(f"  Spectral Jacobi loss:  {jacobi_results['spectral_jacobi_loss']:.6e}")
     except Exception as exc:  # pragma: no cover - defensive path
         if verbose:
             print(f"  Error computing Jacobi error: {exc}")
@@ -186,6 +201,7 @@ def analyze_general_model(
             L_samples.append(L_sample)
 
     L_samples = np.array(L_samples)
+    sample_states = np.asarray([traj[0] for traj in z_traj_list[: min(4, len(z_traj_list))]], dtype=np.float32)
 
     return analyze_general_model_data(
         z_learned=z_pred_array,
@@ -195,4 +211,6 @@ def analyze_general_model(
         system_name="RigidBody",
         analyzer=analyzer,
         verbose=verbose,
+        learner=learner,
+        state_samples=sample_states,
     )

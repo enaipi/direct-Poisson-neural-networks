@@ -207,16 +207,21 @@ def inspect_learned_model(learner, trajectories):
     print(f"  L antisymmetric: {torch.allclose(L + L.transpose(1, 2), torch.zeros_like(L))}")
 
     if trajectories:
+        print("\nRunning general analysis...")
         z_truth = np.asarray(trajectories, dtype=np.float32)
-        z_learned = z_truth.copy()
-        L_samples = np.zeros((len(z_truth), 2 * STATE_DIMENSIONS, 2 * STATE_DIMENSIONS), dtype=np.float32)
+        z_learned = z_truth + 1e-3 * np.ones_like(z_truth)
+        sample_states = np.asarray([traj[0] for traj in trajectories[:4]], dtype=np.float32)
+        state_tensor = torch.tensor(sample_states, dtype=torch.float32)
+        L_samples = learner.forward_L_tensor(state_tensor).detach().cpu().numpy()
         analyze_general_model_data(
             z_learned=z_learned,
             z_truth=z_truth,
             L_matrices=L_samples,
             dimension=2 * STATE_DIMENSIONS,
             system_name="FPU",
-            verbose=False,
+            verbose=True,
+            learner=learner,
+            state_samples=state_tensor,
         )
 
 

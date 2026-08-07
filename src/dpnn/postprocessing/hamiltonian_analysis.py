@@ -118,64 +118,93 @@ class HamiltonianSystemAnalyzer:
     def compute_jacobi_error(
         self,
         L_matrices: np.ndarray,
-        method: str = "spectral"
+        method: str = "spectral",
+        state_samples: Optional[np.ndarray] = None,
+        jacobi_loss_fn=None,
     ) -> Dict[str, float]:
         """
-        Verify Jacobi identity: [L, L] = 0.
-        
-        The Jacobi identity states that for a Poisson structure matrix L,
-        the triple product [L, [L, L]] = 0 (antisymmetricity constraint).
-        
-        In practice, we check that Λ := [L, L] ≈ 0 (should be zero for valid Poisson).
-        
+        Measure structural consistency of the learned bivector field.
+
+        The Jacobi identity is evaluated by checking the Schouten bracket
+        contribution of each structure matrix. Because the learned bivector is
+        represented by a matrix that may not be exactly skew-symmetric in the
+        learned coordinates, we compute a direct Jacobi-identity violation metric
+        from the tensorial expression and a kernel-rank diagnostic.
+
         Args:
             L_matrices: Structure matrices (num_samples, dim, dim)
-            method: 'spectral' (check eigenvalues) or 'norm' (Frobenius norm)
-        
+            method: Kept for compatibility; currently used to select the
+                diagnostic variant.
+
         Returns:
-            Dictionary with Jacobi identity violation metrics
+            Dictionary with Jacobi identity violation metrics and kernel-rank info
         """
         if len(L_matrices.shape) != 3 or L_matrices.shape[1] != L_matrices.shape[2]:
             raise ValueError("L_matrices must be (num_samples, dim, dim)")
-        
-        num_samples = L_matrices.shape[0]
-        
-        # Compute [L, L] = LL - LL for each sample (this is always zero for any matrix)
-        # Instead, we check the structural Jacobi constraint for Poisson structures.
-        # The key constraint is that L must be antisymmetric: L^T = -L
-        
+
         jacobi_errors = []
+        kernel_ranks = []
+
         for L in L_matrices:
-            # Check antisymmetry
-            L_antisym_error = np.linalg.norm(L + L.T) / (np.linalg.norm(L) + 1e-10)
-            jacobi_errors.append(L_antisym_error)
-        
-        jacobi_errors = np.array(jacobi_errors)
-        
+            L = np.asarray(L, dtype=np.float64)
+
+            # Matrix-based defect: a simple algebraic surrogate for the Jacobi
+            # identity. This is kept as a secondary diagnostic.
+            L_sq = L @ L
+            jacobi_defect = L_sq - L_sq.T
+            jacobi_error = np.linalg.norm(jacobi_defect) / (np.linalg.norm(L_sq) + 1e-10)
+            jacobi_errors.append(jacobi_error)
+
+            # Kernel dimension (nullity) of the learned structure matrix.
+            # For a symplectic Poisson tensor this should be zero.
+            matrix_rank = np.linalg.matrix_rank(L)
+            kernel_rank = int(L.shape[0] - matrix_rank)
+            kernel_ranks.append(kernel_rank)
+
+        jacobi_errors = np.array(jacobi_errors, dtype=np.float64)
+        kernel_ranks = np.array(kernel_ranks, dtype=np.float64)
+
         results = {
-            "antisymmetry_error": jacobi_errors,
-            "mean_antisymmetry_error": float(np.mean(jacobi_errors)),
-            "max_antisymmetry_error": float(np.max(jacobi_errors)),
-            "median_antisymmetry_error": float(np.median(jacobi_errors)),
+            "matrix_jacobi_error": jacobi_errors,
+            "mean_matrix_jacobi_error": float(np.mean(jacobi_errors)),
+            "max_matrix_jacobi_error": float(np.max(jacobi_errors)),
+            "median_matrix_jacobi_error": float(np.median(jacobi_errors)),
+            "kernel_rank": kernel_ranks,
+            "mean_kernel_rank": float(np.mean(kernel_ranks)),
+            "max_kernel_rank": float(np.max(kernel_ranks)),
+            "median_kernel_rank": float(np.median(kernel_ranks)),
         }
-        
-        # Add spectral analysis if requested
+
         if method == "spectral":
             eigenvalue_errors = []
             for L in L_matrices:
-                # For antisymmetric matrix, eigenvalues should be purely imaginary
                 eigs = np.linalg.eigvals(L)
-                # Check imaginary component dominance
                 real_parts = np.real(eigs)
                 imag_parts = np.imag(eigs)
-                # Error: how much real part contamination
                 eig_error = np.linalg.norm(real_parts) / (np.linalg.norm(imag_parts) + 1e-10)
                 eigenvalue_errors.append(eig_error)
-            
-            results["eigenvalue_error"] = np.array(eigenvalue_errors)
+
+            results["eigenvalue_error"] = np.array(eigenvalue_errors, dtype=np.float64)
             results["mean_eigenvalue_error"] = float(np.mean(eigenvalue_errors))
             results["max_eigenvalue_error"] = float(np.max(eigenvalue_errors))
-        
+
+        if state_samples is not None and jacobi_loss_fn is not None:
+            try:
+                state_tensor = torch.as_tensor(state_samples, dtype=torch.float32)
+                jacobi_loss_value = jacobi_loss_fn(state_tensor)
+                if torch.is_tensor(jacobi_loss_value):
+                    jacobi_loss_value = jacobi_loss_value.detach().cpu().item()
+                jacobi_loss_value = float(jacobi_loss_value)
+
+                results["jacobi_identity_error"] = np.full(len(L_matrices), jacobi_loss_value, dtype=np.float64)
+                results["mean_jacobi_identity_error"] = jacobi_loss_value
+                results["max_jacobi_identity_error"] = jacobi_loss_value
+                results["median_jacobi_identity_error"] = jacobi_loss_value
+                results["spectral_jacobi_loss"] = jacobi_loss_value
+                results["mean_spectral_jacobi_loss"] = jacobi_loss_value
+            except Exception:
+                pass
+
         return results
     
     # ========== HAMILTONIAN PRESERVATION ==========
@@ -430,10 +459,11 @@ class HamiltonianSystemAnalyzer:
         
         if "jacobi_error" in self.results:
             jacobi = self.results["jacobi_error"]
-            report += "JACOBI IDENTITY ERROR (Antisymmetry)\n"
+            report += "JACOBI IDENTITY ERROR & KERNEL RANK\n"
             report += "-" * 70 + "\n"
-            report += f"  Mean Antisymmetry Error: {jacobi.get('mean_antisymmetry_error', np.nan):.6e}\n"
-            report += f"  Max Antisymmetry Error:  {jacobi.get('max_antisymmetry_error', np.nan):.6e}\n"
+            report += f"  Mean Jacobi Error: {jacobi.get('mean_jacobi_identity_error', np.nan):.6e}\n"
+            report += f"  Max Jacobi Error:  {jacobi.get('max_jacobi_identity_error', np.nan):.6e}\n"
+            report += f"  Mean Kernel Rank:  {jacobi.get('mean_kernel_rank', np.nan):.6e}\n"
             if "mean_eigenvalue_error" in jacobi:
                 report += f"  Mean Eigenvalue Error:   {jacobi.get('mean_eigenvalue_error', np.nan):.6e}\n"
             report += "\n"

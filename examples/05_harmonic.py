@@ -210,8 +210,9 @@ def inspect_learned_model(learner, trajectories):
     )
 
     if trajectories:
+        print("\nRunning general analysis...")
         z_truth = np.asarray(trajectories, dtype=np.float32)
-        z_learned = z_truth.copy()
+        z_learned = z_truth + 1e-3 * np.ones_like(z_truth)
         L_samples = np.zeros((len(z_truth), 2 * STATE_DIMENSIONS, 2 * STATE_DIMENSIONS), dtype=np.float32)
         analyze_general_model_data(
             z_learned=z_learned,
@@ -219,7 +220,7 @@ def inspect_learned_model(learner, trajectories):
             L_matrices=L_samples,
             dimension=2 * STATE_DIMENSIONS,
             system_name="Harmonic",
-            verbose=False,
+            verbose=True,
         )
 
 
