@@ -148,13 +148,6 @@ class HamiltonianSystemAnalyzer:
         for L in L_matrices:
             L = np.asarray(L, dtype=np.float64)
 
-            # Matrix-based defect: a simple algebraic surrogate for the Jacobi
-            # identity. This is kept as a secondary diagnostic.
-            L_sq = L @ L
-            jacobi_defect = L_sq - L_sq.T
-            jacobi_error = np.linalg.norm(jacobi_defect) / (np.linalg.norm(L_sq) + 1e-10)
-            jacobi_errors.append(jacobi_error)
-
             # Nullity of the learned structure matrix.
             # For a canonical symplectic Poisson tensor the matrix is invertible,
             # so its nullity is zero. This diagnostic is still useful for
@@ -162,6 +155,13 @@ class HamiltonianSystemAnalyzer:
             matrix_rank = np.linalg.matrix_rank(L)
             kernel_rank = int(L.shape[0] - matrix_rank)
             kernel_ranks.append(kernel_rank)
+
+            # Keep a lightweight structural summary for fallback reporting, but
+            # do not use it as the primary Jacobi metric.
+            L_sq = L @ L
+            jacobi_defect = L_sq - L_sq.T
+            jacobi_error = np.linalg.norm(jacobi_defect) / (np.linalg.norm(L_sq) + 1e-10)
+            jacobi_errors.append(jacobi_error)
 
         jacobi_errors = np.array(jacobi_errors, dtype=np.float64)
         kernel_ranks = np.array(kernel_ranks, dtype=np.float64)
@@ -175,12 +175,6 @@ class HamiltonianSystemAnalyzer:
             "mean_kernel_rank": float(np.mean(kernel_ranks)),
             "max_kernel_rank": float(np.max(kernel_ranks)),
             "median_kernel_rank": float(np.median(kernel_ranks)),
-            # Use the matrix-based Jacobi defect as the default when no learner
-            # loss is available, so downstream reporting stays numeric.
-            "jacobi_identity_error": jacobi_errors,
-            "mean_jacobi_identity_error": float(np.mean(jacobi_errors)),
-            "max_jacobi_identity_error": float(np.max(jacobi_errors)),
-            "median_jacobi_identity_error": float(np.median(jacobi_errors)),
         }
 
         if method == "spectral":
@@ -196,9 +190,9 @@ class HamiltonianSystemAnalyzer:
             results["mean_eigenvalue_error"] = float(np.mean(eigenvalue_errors))
             results["max_eigenvalue_error"] = float(np.max(eigenvalue_errors))
 
-        if state_samples is not None and jacobi_loss_fn is not None:
+        if jacobi_loss_fn is not None:
             try:
-                state_tensor = torch.as_tensor(state_samples, dtype=torch.float32)
+                state_tensor = torch.as_tensor(state_samples if state_samples is not None else np.zeros((1, L_matrices.shape[1]), dtype=np.float32), dtype=torch.float32)
                 jacobi_loss_value = jacobi_loss_fn(state_tensor)
                 if torch.is_tensor(jacobi_loss_value):
                     jacobi_loss_value = jacobi_loss_value.detach().cpu().item()
@@ -211,7 +205,17 @@ class HamiltonianSystemAnalyzer:
                 results["spectral_jacobi_loss"] = jacobi_loss_value
                 results["mean_spectral_jacobi_loss"] = jacobi_loss_value
             except Exception:
-                pass
+                # Fall back to the matrix-based proxy only when the learner loss is
+                # unavailable or cannot be evaluated.
+                results["jacobi_identity_error"] = jacobi_errors
+                results["mean_jacobi_identity_error"] = float(np.mean(jacobi_errors))
+                results["max_jacobi_identity_error"] = float(np.max(jacobi_errors))
+                results["median_jacobi_identity_error"] = float(np.median(jacobi_errors))
+        else:
+            results["jacobi_identity_error"] = jacobi_errors
+            results["mean_jacobi_identity_error"] = float(np.mean(jacobi_errors))
+            results["max_jacobi_identity_error"] = float(np.max(jacobi_errors))
+            results["median_jacobi_identity_error"] = float(np.median(jacobi_errors))
 
         return results
     
