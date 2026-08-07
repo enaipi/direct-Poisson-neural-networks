@@ -148,6 +148,7 @@ def train_harmonic_learner(trajectories, epochs=5):
         jacobi_loss_mode="spectral",
         integration_scheme="imr",
         use_constant_L=False,
+        name=str(OUTPUT_DIR),
         verbose=False,
     )
     learner.train_loader = DataLoader(train_data, batch_size=32, shuffle=True)

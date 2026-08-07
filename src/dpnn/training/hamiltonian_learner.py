@@ -702,6 +702,18 @@ class HamiltonianLearner:
     # SECTION 6: TRAINING
     # ========================================================================
     
+    def _ensure_output_dirs(self):
+        """
+        Ensure the output directories (data/ and saved_models/) exist under self.name.
+        
+        Creates them automatically if they don't exist, so torch.save and
+        errors_df.to_csv calls in learn() never fail due to missing folders.
+        """
+        base = Path(self.name)
+        base.mkdir(parents=True, exist_ok=True)
+        (base / "data").mkdir(parents=True, exist_ok=True)
+        (base / "saved_models").mkdir(parents=True, exist_ok=True)
+    
     def learn(self, method: str = "without", learning_rate: float = 1e-5,
              epochs: int = 10, prefactor: float = 1.0,
              jac_prefactor: float = 1.0, scheme: str = "IMR"):
@@ -719,6 +731,9 @@ class HamiltonianLearner:
         
         if method not in ["without", "soft", "implicit"]:
             raise ValueError(f"Unknown method '{method}'")
+        
+        # Ensure output directories exist before training/saving
+        self._ensure_output_dirs()
         
         # Compute dt if not provided (default is 0)
         if self.dt <= 0 or self.dt is None:
