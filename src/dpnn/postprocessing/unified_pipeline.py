@@ -17,7 +17,8 @@ def run_postprocessing_analysis(
     folder_name: str,
     model: str = "RB",
     methods: List[str] = None,
-    show_plots: bool = False
+    show_plots: bool = False,
+    verbose: bool = False,
 ) -> Dict[str, Dict]:
     """
     Run complete postprocessing analysis for learned Hamiltonian systems.
@@ -33,6 +34,7 @@ def run_postprocessing_analysis(
         model: Model type (RB, HT, P2D, P3D, K3D, Sh, D)
         methods: List of methods to analyze (default: ["without", "soft", "implicit"])
         show_plots: Whether to display matplotlib plots
+        verbose: Whether to print the shared general-analysis report for each method
     
     Returns:
         Dict with results for each method
@@ -120,6 +122,7 @@ def run_postprocessing_analysis(
             try:
                 Ls = load_normalized_Ls(learned_df, dim)
                 if Ls is not None and len(Ls) > 0:
+                    print("\n  Shared general analysis:")
                     method_analyzer = analyze_general_model_data(
                         z_learned=z_learned,
                         z_truth=z_truth,
@@ -127,7 +130,7 @@ def run_postprocessing_analysis(
                         dimension=dim,
                         system_name=model,
                         analyzer=analyzer,
-                        verbose=False,
+                        verbose=verbose,
                     )
                     method_results["trajectory_error"] = method_analyzer.results["trajectory_discrepancy"]
                     method_results["jacobi_error"] = method_analyzer.results["jacobi_error"]

@@ -108,7 +108,8 @@ def analyze_results(runner, config):
         folder_name=config.folder_name,
         model=config.model,
         methods=config.methods,
-        show_plots=False  # Don't block on matplotlib
+        show_plots=False,  # Don't block on matplotlib
+        verbose=True,      # Show the shared general-analysis report in addition to compatibility diagnostics
     )
     
     return results

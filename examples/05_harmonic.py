@@ -213,14 +213,25 @@ def inspect_learned_model(learner, trajectories):
         print("\nRunning general analysis...")
         z_truth = np.asarray(trajectories, dtype=np.float32)
         z_learned = z_truth + 1e-3 * np.ones_like(z_truth)
-        L_samples = np.zeros((len(z_truth), 2 * STATE_DIMENSIONS, 2 * STATE_DIMENSIONS), dtype=np.float32)
+
+        sample_states = []
+        L_samples = []
+        with torch.no_grad():
+            for traj in trajectories[: min(4, len(trajectories))]:
+                state = torch.tensor(traj[0], dtype=torch.float32, device=DEVICE).unsqueeze(0)
+                sample_states.append(state.cpu().numpy()[0])
+                L = learner.forward_L_tensor(state)[0].detach().cpu().numpy()
+                L_samples.append(L)
+
         analyze_general_model_data(
             z_learned=z_learned,
             z_truth=z_truth,
-            L_matrices=L_samples,
+            L_matrices=np.asarray(L_samples, dtype=np.float32),
             dimension=2 * STATE_DIMENSIONS,
             system_name="Harmonic",
             verbose=True,
+            learner=learner,
+            state_samples=np.asarray(sample_states, dtype=np.float32),
         )
 
 

@@ -175,6 +175,12 @@ class HamiltonianSystemAnalyzer:
             "mean_kernel_rank": float(np.mean(kernel_ranks)),
             "max_kernel_rank": float(np.max(kernel_ranks)),
             "median_kernel_rank": float(np.median(kernel_ranks)),
+            # Use the matrix-based Jacobi defect as the default when no learner
+            # loss is available, so downstream reporting stays numeric.
+            "jacobi_identity_error": jacobi_errors,
+            "mean_jacobi_identity_error": float(np.mean(jacobi_errors)),
+            "max_jacobi_identity_error": float(np.max(jacobi_errors)),
+            "median_jacobi_identity_error": float(np.median(jacobi_errors)),
         }
 
         if method == "spectral":
@@ -463,8 +469,16 @@ class HamiltonianSystemAnalyzer:
             jacobi = self.results["jacobi_error"]
             report += "JACOBI IDENTITY ERROR & STRUCTURE NULLITY\n"
             report += "-" * 70 + "\n"
-            report += f"  Mean Jacobi Error: {jacobi.get('mean_jacobi_identity_error', np.nan):.6e}\n"
-            report += f"  Max Jacobi Error:  {jacobi.get('max_jacobi_identity_error', np.nan):.6e}\n"
+            mean_jacobi_error = jacobi.get(
+                "mean_jacobi_identity_error",
+                jacobi.get("mean_matrix_jacobi_error", np.nan),
+            )
+            max_jacobi_error = jacobi.get(
+                "max_jacobi_identity_error",
+                jacobi.get("max_matrix_jacobi_error", np.nan),
+            )
+            report += f"  Mean Jacobi Error: {mean_jacobi_error:.6e}\n"
+            report += f"  Max Jacobi Error:  {max_jacobi_error:.6e}\n"
             report += f"  Mean Nullity:      {jacobi.get('mean_kernel_rank', np.nan):.6e}\n"
             if "mean_eigenvalue_error" in jacobi:
                 report += f"  Mean Eigenvalue Error:   {jacobi.get('mean_eigenvalue_error', np.nan):.6e}\n"
