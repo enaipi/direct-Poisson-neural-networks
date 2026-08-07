@@ -155,8 +155,10 @@ class HamiltonianSystemAnalyzer:
             jacobi_error = np.linalg.norm(jacobi_defect) / (np.linalg.norm(L_sq) + 1e-10)
             jacobi_errors.append(jacobi_error)
 
-            # Kernel dimension (nullity) of the learned structure matrix.
-            # For a symplectic Poisson tensor this should be zero.
+            # Nullity of the learned structure matrix.
+            # For a canonical symplectic Poisson tensor the matrix is invertible,
+            # so its nullity is zero. This diagnostic is still useful for
+            # non-symplectic or degenerate learned structures.
             matrix_rank = np.linalg.matrix_rank(L)
             kernel_rank = int(L.shape[0] - matrix_rank)
             kernel_ranks.append(kernel_rank)
@@ -459,11 +461,11 @@ class HamiltonianSystemAnalyzer:
         
         if "jacobi_error" in self.results:
             jacobi = self.results["jacobi_error"]
-            report += "JACOBI IDENTITY ERROR & KERNEL RANK\n"
+            report += "JACOBI IDENTITY ERROR & STRUCTURE NULLITY\n"
             report += "-" * 70 + "\n"
             report += f"  Mean Jacobi Error: {jacobi.get('mean_jacobi_identity_error', np.nan):.6e}\n"
             report += f"  Max Jacobi Error:  {jacobi.get('max_jacobi_identity_error', np.nan):.6e}\n"
-            report += f"  Mean Kernel Rank:  {jacobi.get('mean_kernel_rank', np.nan):.6e}\n"
+            report += f"  Mean Nullity:      {jacobi.get('mean_kernel_rank', np.nan):.6e}\n"
             if "mean_eigenvalue_error" in jacobi:
                 report += f"  Mean Eigenvalue Error:   {jacobi.get('mean_eigenvalue_error', np.nan):.6e}\n"
             report += "\n"

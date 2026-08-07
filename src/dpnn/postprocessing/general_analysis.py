@@ -87,7 +87,7 @@ def analyze_general_model_data(
                 jacobi_results.get("mean_jacobi_identity_error", np.nan),
             )
             print(f"  Jacobi identity error: {primary_jacobi_error:.6e}")
-            print(f"  Mean kernel rank:      {jacobi_results['mean_kernel_rank']:.6e}")
+            print(f"  Nullity of structure:   {jacobi_results['mean_kernel_rank']:.6e}")
             if "max_jacobi_identity_error" in jacobi_results:
                 print(f"  Max Jacobi error:      {jacobi_results['max_jacobi_identity_error']:.6e}")
             if "spectral_jacobi_loss" in jacobi_results:
