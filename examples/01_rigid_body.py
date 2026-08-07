@@ -25,6 +25,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dpnn.comparison import ComparisonConfig, ComparisonRunner
 from dpnn.postprocessing import HamiltonianSystemAnalyzer
 
+# All example outputs (data/ and saved_models/) are collected under this
+# top-level results folder, which is created automatically if missing.
+RESULTS_DIR = Path("results")
+
 
 def main():
     """Run rigid body comparison using comparison.py infrastructure."""
@@ -68,7 +72,7 @@ def main():
         jacobi_loss_mode="spectral",
         
         # Output folder
-        folder_name="examples_rigid_body",
+        folder_name=str(RESULTS_DIR / "examples_rigid_body"),
         
         # Verbosity
         verbose=False

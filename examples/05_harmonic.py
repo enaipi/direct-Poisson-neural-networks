@@ -43,7 +43,10 @@ STEPS_PER_TRAJECTORY = 200
 DT = 0.01
 M = 1.0
 K = 1.0
-OUTPUT_DIR = Path("examples_harmonic")
+# All example outputs (data/ and saved_models/) are collected under this
+# top-level results folder, which is created automatically if missing.
+RESULTS_DIR = Path("results")
+OUTPUT_DIR = RESULTS_DIR / "examples_harmonic"
 UNITS = {"position": "dimensionless", "momentum": "dimensionless", "time": "s"}
 
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")

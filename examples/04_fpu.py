@@ -36,7 +36,10 @@ STATE_DIMENSIONS = 8
 NUM_TRAJECTORIES = 12
 STEPS_PER_TRAJECTORY = 200
 DT = 0.01
-OUTPUT_DIR = Path("examples_fpu")
+# All example outputs (data/ and saved_models/) are collected under this
+# top-level results folder, which is created automatically if missing.
+RESULTS_DIR = Path("results")
+OUTPUT_DIR = RESULTS_DIR / "examples_fpu"
 UNITS = {"position": "dimensionless", "momentum": "dimensionless", "time": "s"}
 
 

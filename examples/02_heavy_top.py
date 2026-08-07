@@ -22,6 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dpnn.comparison import ComparisonConfig, ComparisonRunner
 
+# All example outputs (data/ and saved_models/) are collected under this
+# top-level results folder, which is created automatically if missing.
+RESULTS_DIR = Path("results")
+
 
 def main():
     """Run heavy top comparison using comparison.py infrastructure."""
@@ -69,7 +73,7 @@ def main():
         jacobi_loss_mode="spectral",
         
         # Output folder
-        folder_name="examples_heavy_top",
+        folder_name=str(RESULTS_DIR / "examples_heavy_top"),
         
         # Verbosity
         verbose=False

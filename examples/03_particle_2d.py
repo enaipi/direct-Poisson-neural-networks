@@ -23,6 +23,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dpnn.comparison import ComparisonConfig, ComparisonRunner
 
+# All example outputs (data/ and saved_models/) are collected under this
+# top-level results folder, which is created automatically if missing.
+RESULTS_DIR = Path("results")
+
 
 def main():
     """Run particle 2D comparison using comparison.py infrastructure."""
@@ -62,7 +66,7 @@ def main():
         jacobi_loss_mode="spectral",
         
         # Output folder
-        folder_name="examples_particle_2d",
+        folder_name=str(RESULTS_DIR / "examples_particle_2d"),
         
         # Verbosity
         verbose=False
