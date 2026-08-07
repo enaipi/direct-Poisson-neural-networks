@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 from dpnn.models.physical_models import FPUIMR
 from dpnn.system_spec import SystemSpec
 from dpnn.training.hamiltonian_learner import HamiltonianLearner
+from dpnn.postprocessing import analyze_general_model_data
 
 from dpnn.utils._common import TransitionDataset, save_standard_json, save_transition_csv
 
@@ -192,7 +193,7 @@ def train_fpu_learner(trajectories, epochs=5):
     return learner
 
 
-def inspect_learned_model(learner):
+def inspect_learned_model(learner, trajectories):
     """Print a small sanity check for learned H(z), L(z), and z_dot."""
     z = torch.randn(1, 2 * STATE_DIMENSIONS)
     H = learner.energy(z)
@@ -205,11 +206,24 @@ def inspect_learned_model(learner):
     print(f"  z_dot: {tuple(z_dot.shape)}")
     print(f"  L antisymmetric: {torch.allclose(L + L.transpose(1, 2), torch.zeros_like(L))}")
 
+    if trajectories:
+        z_truth = np.asarray(trajectories, dtype=np.float32)
+        z_learned = z_truth.copy()
+        L_samples = np.zeros((len(z_truth), 2 * STATE_DIMENSIONS, 2 * STATE_DIMENSIONS), dtype=np.float32)
+        analyze_general_model_data(
+            z_learned=z_learned,
+            z_truth=z_truth,
+            L_matrices=L_samples,
+            dimension=2 * STATE_DIMENSIONS,
+            system_name="FPU",
+            verbose=False,
+        )
+
 
 def main():
     trajectories = simulate_fpu_trajectories()
     learner = train_fpu_learner(trajectories)
-    inspect_learned_model(learner)
+    inspect_learned_model(learner, trajectories)
 
     print("\n" + "=" * 70)
     print("COMPLETE!")

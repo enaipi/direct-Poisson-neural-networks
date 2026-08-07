@@ -8,6 +8,7 @@ from typing import Dict, List, Optional
 
 from dpnn.comparison import plot_training_errors
 from .hamiltonian_analysis import HamiltonianSystemAnalyzer
+from .general_analysis import analyze_general_model_data
 from .error_computation import compat_error3D, compat_error_superintegrable, compat_error_6d_separable
 from .data_utils import load_dataframes, load_normalized_Ls
 
@@ -115,32 +116,35 @@ def run_postprocessing_analysis(
                 print(f"    Warning: Could not extract state from learned data")
                 continue
             
-            # TRAJECTORY FIT ERROR
-            try:
-                traj_error = analyzer.compute_trajectory_discrepancy(
-                    z_learned, z_truth, metric="rmse"
-                )
-                method_results["trajectory_error"] = traj_error
-                print(f"  Trajectory RMSE:")
-                print(f"    - Mean:   {traj_error['mean_error']:.6e}")
-                print(f"    - Median: {traj_error['median_error']:.6e}")
-                print(f"    - Max:    {traj_error['max_error']:.6e}")
-            except Exception as e:
-                print(f"    Warning: Could not compute trajectory error: {e}")
-            
-            # JACOBI IDENTITY ERROR (antisymmetry of L matrices)
+            # GENERAL ANALYSIS (trajectory fit, Jacobi identity, component errors)
             try:
                 Ls = load_normalized_Ls(learned_df, dim)
                 if Ls is not None and len(Ls) > 0:
-                    jacobi_error = analyzer.compute_jacobi_error(Ls, method="spectral")
-                    method_results["jacobi_error"] = jacobi_error
+                    method_analyzer = analyze_general_model_data(
+                        z_learned=z_learned,
+                        z_truth=z_truth,
+                        L_matrices=Ls,
+                        dimension=dim,
+                        system_name=model,
+                        analyzer=analyzer,
+                        verbose=False,
+                    )
+                    method_results["trajectory_error"] = method_analyzer.results["trajectory_discrepancy"]
+                    method_results["jacobi_error"] = method_analyzer.results["jacobi_error"]
+                    method_results["component_errors"] = method_analyzer.results.get("component_errors", {})
+                    print(f"  Trajectory RMSE:")
+                    print(f"    - Mean:   {method_results['trajectory_error']['mean_error']:.6e}")
+                    print(f"    - Median: {method_results['trajectory_error']['median_error']:.6e}")
+                    print(f"    - Max:    {method_results['trajectory_error']['max_error']:.6e}")
                     print(f"  Jacobi Identity Error:")
-                    print(f"    - Mean antisymmetry: {jacobi_error['mean_antisymmetry_error']:.6e}")
-                    print(f"    - Max antisymmetry:  {jacobi_error['max_antisymmetry_error']:.6e}")
-                    if 'mean_eigenvalue_imag_part' in jacobi_error:
-                        print(f"    - Eigenvalue purity: {jacobi_error['mean_eigenvalue_imag_part']:.6e}")
+                    print(f"    - Mean antisymmetry: {method_results['jacobi_error']['mean_antisymmetry_error']:.6e}")
+                    print(f"    - Max antisymmetry:  {method_results['jacobi_error']['max_antisymmetry_error']:.6e}")
+                    if 'mean_eigenvalue_error' in method_results['jacobi_error']:
+                        print(f"    - Eigenvalue purity: {method_results['jacobi_error']['mean_eigenvalue_error']:.6e}")
+                else:
+                    print("    Warning: No L matrices available for general analysis")
             except Exception as e:
-                print(f"    Warning: Could not compute Jacobi error: {e}")
+                print(f"    Warning: Could not compute general analysis: {e}")
             
             # MODEL-SPECIFIC COMPATIBILITY ERRORS
             try:

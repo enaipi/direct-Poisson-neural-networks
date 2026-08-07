@@ -23,7 +23,6 @@ import json
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from dpnn.comparison import ComparisonConfig, ComparisonRunner
-from dpnn.postprocessing import HamiltonianSystemAnalyzer
 
 # All example outputs (data/ and saved_models/) are collected under this
 # top-level results folder, which is created automatically if missing.

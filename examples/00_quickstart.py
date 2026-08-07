@@ -353,191 +353,21 @@ def extract_learned_functions(learner, dim):
 def analyze_learned_model(learner, z_timeseries, dim, dt):
     """
     Use HamiltonianSystemAnalyzer to measure learning quality.
-    
-    Computes and displays:
-    - Trajectory discrepancy (learned vs ground truth)
-    - Jacobi identity error (Poisson structure validation)
-    - Per-component error breakdown
+
+    This delegates the analysis logic to the postprocessing package while
+    preserving the example's interface and console output.
     """
-    from dpnn.postprocessing import HamiltonianSystemAnalyzer
-    
-    print("\n" + "="*70)
-    print("STEP 5: ANALYZE LEARNED MODEL QUALITY")
-    print("="*70)
-    
-    # Create analyzer
-    analyzer = HamiltonianSystemAnalyzer(
-        dimension=dim,
-        system_name="RigidBody"
+    from dpnn.postprocessing import HamiltonianSystemAnalyzer, analyze_general_model
+
+    analyzer = HamiltonianSystemAnalyzer(dimension=dim, system_name="RigidBody")
+    return analyze_general_model(
+        learner=learner,
+        z_timeseries=z_timeseries,
+        dim=dim,
+        dt=dt,
+        num_trajectories=num_trajectories,
+        analyzer=analyzer,
     )
-    
-    # -----------------------------------------------------------------------
-    # Split concatenated trajectories back into individual trajectories
-    # -----------------------------------------------------------------------
-    num_steps_per_traj = len(z_timeseries) // num_trajectories
-    z_traj_list = [
-        z_timeseries[i*num_steps_per_traj:(i+1)*num_steps_per_traj]
-        for i in range(num_trajectories)
-    ]
-    
-    print(f"\nGenerating predictions for {len(z_traj_list)} trajectories...")
-    
-    learner.energy.eval()
-    learner.L_tensor.eval()
-    
-    # Generate predictions for each trajectory
-    z_pred_list = []
-    
-    for traj_idx, z_traj_truth in enumerate(z_traj_list):
-        z_pred = [z_traj_truth[0]]  # Start with first state
-        z_current = torch.tensor(z_traj_truth[0], dtype=torch.float32)
-        
-        for step in range(1, len(z_traj_truth)):
-            # Compute ∇H (needs gradients)
-            z_current = z_current.clone().detach().requires_grad_(True)
-            H = learner.energy(z_current.unsqueeze(0))
-            H.backward()
-            grad_H = z_current.grad.detach().clone()  # Properly detach before using
-            
-            # Get L(z) and advance (no gradients needed)
-            with torch.no_grad():
-                L_z = learner.forward_L_tensor(z_current.unsqueeze(0))[0]
-                z_dot = L_z @ grad_H  # Both tensors are now detached
-                z_next = (z_current.detach() + dt * z_dot).cpu().numpy()
-                z_pred.append(z_next)
-                z_current = torch.tensor(z_next, dtype=torch.float32)
-        
-        z_pred_list.append(np.array(z_pred))
-    
-    z_pred_array = np.array(z_pred_list)
-    z_truth_array = np.array(z_traj_list)
-    
-    print(f"✓ Generated {len(z_pred_list)} trajectories")
-    print(f"  Shapes - Learned: {z_pred_array.shape}, Truth: {z_truth_array.shape}")
-    
-    # Check for NaN/inf values
-    pred_has_nan = np.any(np.isnan(z_pred_array)) or np.any(np.isinf(z_pred_array))
-    truth_has_nan = np.any(np.isnan(z_truth_array)) or np.any(np.isinf(z_truth_array))
-    print(f"  Learned has NaN/inf: {pred_has_nan}")
-    print(f"  Truth has NaN/inf: {truth_has_nan}")
-    
-    if pred_has_nan:
-        print(f"  WARNING: Learned predictions contain NaN/inf!")
-        nan_count = np.sum(np.isnan(z_pred_array))
-        inf_count = np.sum(np.isinf(z_pred_array))
-        print(f"    NaN count: {nan_count}, Inf count: {inf_count}")
-        print(f"    Sample learned values: {z_pred_array[0, :5, :]}")
-    
-    if truth_has_nan:
-        print(f"  WARNING: Ground truth contains NaN/inf!")
-    
-    # Check for trajectory divergence/explosion
-    pred_max = np.nanmax(np.abs(z_pred_array))
-    truth_max = np.nanmax(np.abs(z_truth_array))
-    print(f"  Max absolute values - Learned: {pred_max:.6e}, Truth: {truth_max:.6e}")
-    
-    if pred_max > 1e3:
-        print(f"  WARNING: Learned trajectory has exploded! (max > 1e3)")
-    
-    # -----------------------------------------------------------------------
-    # Trajectory Fit Error (matching unified pipeline)
-    # -----------------------------------------------------------------------
-    print("\n--- Trajectory Fit Error ---")
-    
-    try:
-        # Compute difference
-        diff = z_pred_array - z_truth_array
-        rmse_per_point = np.sqrt(np.mean(diff**2, axis=2))  # (num_traj, num_steps)
-        
-        # Check for NaN
-        if np.any(np.isnan(rmse_per_point)):
-            print(f"  WARNING: RMSE computation resulted in NaN")
-            print(f"    Diff has NaN: {np.any(np.isnan(diff))}")
-            print(f"    Diff has inf: {np.any(np.isinf(diff))}")
-            print(f"    Diff min: {np.nanmin(diff)}, max: {np.nanmax(diff)}")
-        
-        # Flatten to get all RMSE values
-        rmse_flat = rmse_per_point.flatten()
-        rmse_flat = rmse_flat[~np.isnan(rmse_flat)]  # Remove NaN for stats
-        
-        if len(rmse_flat) == 0:
-            print(f"  ERROR: All RMSE values are NaN!")
-            traj_results = {
-                'mean_error': np.nan,
-                'median_error': np.nan,
-                'max_error': np.nan
-            }
-        else:
-            traj_results = {
-                'mean_error': np.mean(rmse_flat),
-                'median_error': np.median(rmse_flat),
-                'max_error': np.max(rmse_flat)
-            }
-        
-        analyzer.results["trajectory_discrepancy"] = traj_results
-        
-        print(f"  Mean RMSE:   {traj_results['mean_error']:.6e}")
-        print(f"  Median RMSE: {traj_results['median_error']:.6e}")
-        print(f"  Max RMSE:    {traj_results['max_error']:.6e}")
-    except Exception as e:
-        print(f"  Error computing trajectory discrepancy: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    # -----------------------------------------------------------------------
-    # Jacobi Identity Error (matching unified pipeline)
-    # -----------------------------------------------------------------------
-    print("\n--- Jacobi Identity Error ---")
-    
-    # Sample L matrices at different states
-    L_samples = []
-    num_samples = min(50, len(z_timeseries))
-    sample_indices = np.linspace(0, len(z_timeseries)-1, num_samples, dtype=int)
-    
-    with torch.no_grad():
-        for idx in sample_indices:
-            z_sample = torch.tensor(z_timeseries[idx], dtype=torch.float32)
-            L_sample = learner.forward_L_tensor(z_sample.unsqueeze(0))[0].numpy()
-            L_samples.append(L_sample)
-    
-    L_samples = np.array(L_samples)
-    
-    try:
-        jacobi_results = analyzer.compute_jacobi_error(L_samples, method="spectral")
-        analyzer.results["jacobi_error"] = jacobi_results
-        
-        print(f"  Antisymmetry error:  {jacobi_results['mean_antisymmetry_error']:.6e}")
-        if "max_antisymmetry_error" in jacobi_results:
-            print(f"  Max antisymmetry:    {jacobi_results['max_antisymmetry_error']:.6e}")
-    except Exception as e:
-        print(f"  Error computing Jacobi error: {e}")
-    
-    # -----------------------------------------------------------------------
-    # Per-Component Error (optional detail)
-    # -----------------------------------------------------------------------
-    print("\n--- Per-Component Error ---")
-    
-    try:
-        comp_errors = analyzer.trajectory_error_per_component(
-            z_pred_array,
-            z_truth_array
-        )
-        analyzer.results["component_errors"] = comp_errors
-        
-        for comp_idx in sorted(comp_errors.keys()):
-            print(f"  Component {comp_idx}: {comp_errors[comp_idx]:.6e}")
-    except Exception as e:
-        print(f"  Error computing per-component errors: {e}")
-    
-    # -----------------------------------------------------------------------
-    # Summary Report
-    # -----------------------------------------------------------------------
-    print("\n" + analyzer.generate_report())
-    
-    return analyzer
-
-
-# ============================================================================
 # STEP 6: COMPARE WITH GROUND TRUTH (if available)
 # ============================================================================
 
