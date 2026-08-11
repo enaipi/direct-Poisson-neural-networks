@@ -13,7 +13,9 @@ import pandas as pd
 import torch
 import matplotlib.pyplot as plt
 from pathlib import Path
-from typing import Dict, Tuple, Optional, List
+from typing import Dict, Tuple, Optional, List, Callable
+
+from dpnn.utils.jacobi_identity import jacobi_loss_spectral, compute_jacobi_loss
 
 
 class HamiltonianSystemAnalyzer:
@@ -121,20 +123,21 @@ class HamiltonianSystemAnalyzer:
         method: str = "spectral",
         state_samples: Optional[np.ndarray] = None,
         jacobi_loss_fn=None,
+        L_func: Optional[Callable] = None,
     ) -> Dict[str, float]:
         """
         Measure structural consistency of the learned bivector field.
 
-        The Jacobi identity is evaluated by checking the Schouten bracket
-        contribution of each structure matrix. Because the learned bivector is
-        represented by a matrix that may not be exactly skew-symmetric in the
-        learned coordinates, we compute a direct Jacobi-identity violation metric
-        from the tensorial expression and a kernel-rank diagnostic.
+        Evaluates the true spectral Jacobi identity error [L, L](z) = 0 over state
+        samples using autograd power iteration from dpnn.utils.jacobi_identity. Also
+        computes matrix rank nullity and eigenvalue purity diagnostics.
 
         Args:
             L_matrices: Structure matrices (num_samples, dim, dim)
-            method: Kept for compatibility; currently used to select the
-                diagnostic variant.
+            method: Diagnostic mode (e.g., 'spectral').
+            state_samples: Optional state samples (num_samples, dim)
+            jacobi_loss_fn: Optional pre-bound loss function taking state tensor
+            L_func: Optional structure field callable z -> L(z) of shape (B, d, d)
 
         Returns:
             Dictionary with Jacobi identity violation metrics and kernel-rank info
@@ -142,35 +145,17 @@ class HamiltonianSystemAnalyzer:
         if len(L_matrices.shape) != 3 or L_matrices.shape[1] != L_matrices.shape[2]:
             raise ValueError("L_matrices must be (num_samples, dim, dim)")
 
-        jacobi_errors = []
         kernel_ranks = []
 
         for L in L_matrices:
             L = np.asarray(L, dtype=np.float64)
-
-            # Nullity of the learned structure matrix.
-            # For a canonical symplectic Poisson tensor the matrix is invertible,
-            # so its nullity is zero. This diagnostic is still useful for
-            # non-symplectic or degenerate learned structures.
             matrix_rank = np.linalg.matrix_rank(L)
             kernel_rank = int(L.shape[0] - matrix_rank)
             kernel_ranks.append(kernel_rank)
 
-            # Keep a lightweight structural summary for fallback reporting, but
-            # do not use it as the primary Jacobi metric.
-            L_sq = L @ L
-            jacobi_defect = L_sq - L_sq.T
-            jacobi_error = np.linalg.norm(jacobi_defect) / (np.linalg.norm(L_sq) + 1e-10)
-            jacobi_errors.append(jacobi_error)
-
-        jacobi_errors = np.array(jacobi_errors, dtype=np.float64)
         kernel_ranks = np.array(kernel_ranks, dtype=np.float64)
 
         results = {
-            "matrix_jacobi_error": jacobi_errors,
-            "mean_matrix_jacobi_error": float(np.mean(jacobi_errors)),
-            "max_matrix_jacobi_error": float(np.max(jacobi_errors)),
-            "median_matrix_jacobi_error": float(np.median(jacobi_errors)),
             "kernel_rank": kernel_ranks,
             "mean_kernel_rank": float(np.mean(kernel_ranks)),
             "max_kernel_rank": float(np.max(kernel_ranks)),
@@ -190,9 +175,16 @@ class HamiltonianSystemAnalyzer:
             results["mean_eigenvalue_error"] = float(np.mean(eigenvalue_errors))
             results["max_eigenvalue_error"] = float(np.max(eigenvalue_errors))
 
+        # Build jacobi_loss_fn if L_func is provided
+        if jacobi_loss_fn is None and L_func is not None:
+            jacobi_loss_fn = lambda z: jacobi_loss_spectral(L_func, z)
+
         if jacobi_loss_fn is not None:
             try:
-                state_tensor = torch.as_tensor(state_samples if state_samples is not None else np.zeros((1, L_matrices.shape[1]), dtype=np.float32), dtype=torch.float32)
+                state_tensor = torch.as_tensor(
+                    state_samples if state_samples is not None else np.zeros((1, L_matrices.shape[1]), dtype=np.float32),
+                    dtype=torch.float32
+                )
                 jacobi_loss_value = jacobi_loss_fn(state_tensor)
                 if torch.is_tensor(jacobi_loss_value):
                     jacobi_loss_value = jacobi_loss_value.detach().cpu().item()
@@ -204,18 +196,16 @@ class HamiltonianSystemAnalyzer:
                 results["median_jacobi_identity_error"] = jacobi_loss_value
                 results["spectral_jacobi_loss"] = jacobi_loss_value
                 results["mean_spectral_jacobi_loss"] = jacobi_loss_value
-            except Exception:
-                # Fall back to the matrix-based proxy only when the learner loss is
-                # unavailable or cannot be evaluated.
-                results["jacobi_identity_error"] = jacobi_errors
-                results["mean_jacobi_identity_error"] = float(np.mean(jacobi_errors))
-                results["max_jacobi_identity_error"] = float(np.max(jacobi_errors))
-                results["median_jacobi_identity_error"] = float(np.median(jacobi_errors))
+            except Exception as e:
+                results["jacobi_identity_error"] = np.full(len(L_matrices), np.nan, dtype=np.float64)
+                results["mean_jacobi_identity_error"] = np.nan
+                results["max_jacobi_identity_error"] = np.nan
+                results["median_jacobi_identity_error"] = np.nan
         else:
-            results["jacobi_identity_error"] = jacobi_errors
-            results["mean_jacobi_identity_error"] = float(np.mean(jacobi_errors))
-            results["max_jacobi_identity_error"] = float(np.max(jacobi_errors))
-            results["median_jacobi_identity_error"] = float(np.median(jacobi_errors))
+            results["jacobi_identity_error"] = np.full(len(L_matrices), np.nan, dtype=np.float64)
+            results["mean_jacobi_identity_error"] = np.nan
+            results["max_jacobi_identity_error"] = np.nan
+            results["median_jacobi_identity_error"] = np.nan
 
         return results
     

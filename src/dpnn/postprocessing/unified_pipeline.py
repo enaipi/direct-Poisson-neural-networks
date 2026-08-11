@@ -11,6 +11,7 @@ from .hamiltonian_analysis import HamiltonianSystemAnalyzer
 from .general_analysis import analyze_general_model_data
 from .error_computation import compat_error3D, compat_error_superintegrable, compat_error_6d_separable
 from .data_utils import load_dataframes, load_normalized_Ls
+from .model_generation import load_L_model_from_folder
 
 
 def run_postprocessing_analysis(
@@ -117,12 +118,18 @@ def run_postprocessing_analysis(
             if z_learned is None:
                 print(f"    Warning: Could not extract state from learned data")
                 continue
-            
+
             # GENERAL ANALYSIS (trajectory fit, Jacobi identity, component errors)
             try:
                 Ls = load_normalized_Ls(learned_df, dim)
                 if Ls is not None and len(Ls) > 0:
                     print("\n  Shared general analysis:")
+                    L_func_loaded = load_L_model_from_folder(folder_name, method, dim)
+                    class LearnerWrapper:
+                        def __init__(self, fn):
+                            self.forward_L_tensor = fn
+                    learner_obj = LearnerWrapper(L_func_loaded) if L_func_loaded is not None else None
+
                     method_analyzer = analyze_general_model_data(
                         z_learned=z_learned,
                         z_truth=z_truth,
@@ -131,6 +138,7 @@ def run_postprocessing_analysis(
                         system_name=model,
                         analyzer=analyzer,
                         verbose=verbose,
+                        learner=learner_obj,
                     )
                     method_results["trajectory_error"] = method_analyzer.results["trajectory_discrepancy"]
                     method_results["jacobi_error"] = method_analyzer.results["jacobi_error"]

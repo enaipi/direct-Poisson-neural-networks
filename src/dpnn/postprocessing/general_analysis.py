@@ -73,12 +73,23 @@ def analyze_general_model_data(
             print(f"  Error computing trajectory discrepancy: {exc}")
 
     try:
-        jacobi_loss_fn = getattr(learner, "jacobi_loss", None) if learner is not None else None
+        L_func = getattr(learner, "forward_L_tensor", None) if learner is not None else None
+        jacobi_loss_fn = getattr(learner, "jacobi_loss_spectral", getattr(learner, "jacobi_loss", None)) if learner is not None else None
+
+        if state_samples is None and z_truth_array is not None and len(z_truth_array) > 0:
+            flat_states = z_truth_array.reshape(-1, dimension)
+            if len(flat_states) > 50:
+                indices = np.linspace(0, len(flat_states) - 1, 50, dtype=int)
+                state_samples = flat_states[indices]
+            else:
+                state_samples = flat_states
+
         jacobi_results = analyzer.compute_jacobi_error(
             L_samples,
             method="spectral",
             state_samples=state_samples,
             jacobi_loss_fn=jacobi_loss_fn,
+            L_func=L_func,
         )
         analyzer.results["jacobi_error"] = jacobi_results
         if verbose:

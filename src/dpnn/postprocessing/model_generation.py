@@ -5,6 +5,42 @@ import numpy as np
 from pathlib import Path
 
 
+def load_L_model_from_folder(folder_name: str, method: str, dim: int):
+    """
+    Load PyTorch L(z) field model from saved_models directory.
+    
+    Args:
+        folder_name: Folder with results (containing saved_models/)
+        method: Method name ('without', 'soft', 'implicit')
+        dim: System dimension
+        
+    Returns:
+        Callable z -> L(z) of shape (B, dim, dim) or None
+    """
+    path_l = Path(folder_name) / "saved_models" / f"{method}_jacobi_L"
+    path_j = Path(folder_name) / "saved_models" / f"{method}_jacobi_J"
+    
+    target_path = path_l if path_l.exists() else (path_j if path_j.exists() else None)
+    if target_path is None:
+        return None
+
+    try:
+        loaded = torch.load(target_path, weights_only=False)
+        if isinstance(loaded, dict):
+            if loaded.get('L_type') == 'constant':
+                A = loaded['A']
+                return lambda z: (A - A.t()).unsqueeze(0).repeat(z.size(0), 1, 1)
+            elif 'L_tensor' in loaded:
+                L_net = loaded['L_tensor']
+                return lambda z: L_net(z)
+        elif hasattr(loaded, '__call__'):
+            return lambda z: loaded(z)
+    except Exception:
+        pass
+
+    return None
+
+
 def load_learned_models(folder_name, model_type, load_energy=True):
     """
     Load learned models from checkpoint files.
