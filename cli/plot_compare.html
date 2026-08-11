@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>plot-compare - Visualize and Compare Models &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=eeb27264" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="learn - Train Neural Network Models" href="learn.html" />
+    <link rel="prev" title="comparison - Generate and Compare Models" href="comparison.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="plot-compare-visualize-and-compare-models">
+<h1>plot-compare - Visualize and Compare Models<a class="headerlink" href="#plot-compare-visualize-and-compare-models" title="Link to this heading">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">plot-compare</span></code> command generates visualizations comparing ground truth trajectories with learned model trajectories.</p>
+<p id="module-dpnn.postprocessing.plot_compare">Comparison and visualization of learned Poisson structures.</p>
+<p>This module provides tools to:
+- Load and process trajectory data
+- Visualize learned vs ground truth Poisson structures
+- Compute compatibility errors
+- Compare old Learner vs GeneralSystemLearner models</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.get_frames_and_titles">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">get_frames_and_titles</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.get_frames_and_titles" title="Link to this definition">¶</a></dt>
+<dd><p>Get list of dataframes and titles to plot based on args.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_fields_from_dataframes">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_fields_from_dataframes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">field_list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_fields_from_dataframes" title="Link to this definition">¶</a></dt>
+<dd><p>Plot specified fields from dataframes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_first">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_first</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_first" title="Link to this definition">¶</a></dt>
+<dd><p>Plot only first trajectory for a field.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_fields_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_fields_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fields</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_fields_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot histograms of field errors (learned vs ground truth).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_compatibility_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_compatibility_errors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_compatibility_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot L compatibility errors.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_L_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_L_errors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_L_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot L matrix reconstruction errors.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_l_models">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_l_models</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_l_models" title="Link to this definition">¶</a></dt>
+<dd><p>Plot learned L models from neural networks.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_energy_models">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_energy_models</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_energy_models" title="Link to this definition">¶</a></dt>
+<dd><p>Plot learned energy models from neural networks.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.main">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.main" title="Link to this definition">¶</a></dt>
+<dd><p>Main entry point for plot_compare script.</p>
+</dd></dl>
+
+<section id="usage">
+<h2>Usage<a class="headerlink" href="#usage" title="Link to this heading">¶</a></h2>
+<p>Compare models with ground truth:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_RB_errors<span class="w"> </span>--GT<span class="w"> </span>--without<span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+<p>Plot specific fields:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_m<span class="w"> </span>--plot_E<span class="w"> </span>--plot_L<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+</section>
+<section id="command-options">
+<h2>Command Options<a class="headerlink" href="#command-options" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--help
+</pre></div>
+</div>
+<section id="common-arguments">
+<h3>Common Arguments<a class="headerlink" href="#common-arguments" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--GT</span></code>: Include ground truth data in plots</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--without</span></code>: Include model without Jacobi structure</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--implicit</span></code>: Include implicit Jacobi model</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--soft</span></code>: Include soft Jacobi model</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--dataset</span></code>: Include dataset trajectories</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--folder_name</span></code>: Output folder name (default: TEST)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--export</span></code>: Save figures to PNG files</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--model</span></code>: Mechanical system model (RB, HT, P3D, etc.; default: RB)</p></li>
+</ul>
+</section>
+<section id="plotting-options">
+<h3>Plotting Options<a class="headerlink" href="#plotting-options" title="Link to this heading">¶</a></h3>
+<p><strong>Field Plotting:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_m</span></code>: Plot momentum (m_x, m_y, m_z)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_r</span></code>: Plot position (r_x, r_y, r_z)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_E</span></code>: Plot energy</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_L</span></code>: Plot Poisson bivector components</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_field</span> <span class="pre">FIELD</span></code>: Plot custom field</p></li>
+</ul>
+<p><strong>Error Analysis:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_RB_errors</span></code>: Plot momentum errors (for Rigid Body)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_HT_errors</span></code>: Plot errors for Heavy Top</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_P3D_errors</span></code>: Plot errors for 3D particle</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_P2D_errors</span></code>: Plot errors for 2D particle (Shivamoggi)</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_L_errors</span></code>: Plot Poisson bracket tensor errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_msq_errors</span></code>: Plot squared momentum magnitude errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_mrs_errors</span></code>: Plot m·r errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_am_errors</span></code>: Plot angular momentum errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_training_errors</span></code>: Plot training/validation loss comparison</p></li>
+</ul>
+<p><strong>Advanced Plotting:</strong></p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_Es</span></code>: Plot energy surfaces</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_Ls</span></code>: Plot Poisson tensor surfaces</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_Jacobi</span></code>: Plot Jacobian information</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_Casimir</span></code>: Plot Casimir functions</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_spectrum_errors</span></code>: Plot spectrum errors</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">--plot_compatibility</span></code>: Plot compatibility errors</p></li>
+</ul>
+</section>
+</section>
+<section id="example-workflows">
+<h2>Example Workflows<a class="headerlink" href="#example-workflows" title="Link to this heading">¶</a></h2>
+<p>Basic comparison - all models with ground truth:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_RB_errors<span class="w"> </span>--GT<span class="w"> </span>--without<span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+<p>Plot specific fields:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_m<span class="w"> </span>--plot_E<span class="w"> </span>--plot_L<span class="w"> </span>--GT<span class="w"> </span>--soft<span class="w"> </span>--implicit<span class="w"> </span>--without
+</pre></div>
+</div>
+<p>Plot energy surfaces and tensors:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_Es<span class="w"> </span>--plot_Ls<span class="w"> </span>--soft<span class="w"> </span>--implicit<span class="w"> </span>--without
+</pre></div>
+</div>
+<p>Export figures:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--export<span class="w"> </span>--plot_RB_errors<span class="w"> </span>--GT<span class="w"> </span>--without<span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+<p>Compare different models:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># Heavy Top</span>
+plot-compare<span class="w"> </span>--plot_HT_errors<span class="w"> </span>--GT<span class="w"> </span>--soft<span class="w"> </span>--implicit<span class="w"> </span>--model<span class="o">=</span>HT<span class="w"> </span>--folder_name<span class="o">=</span>TEST_HT
+
+<span class="c1"># 3D Particle</span>
+plot-compare<span class="w"> </span>--plot_P3D_errors<span class="w"> </span>--GT<span class="w"> </span>--soft<span class="w"> </span>--implicit<span class="w"> </span>--model<span class="o">=</span>P3D<span class="w"> </span>--folder_name<span class="o">=</span>TEST_P3D
+</pre></div>
+</div>
+</section>
+<section id="output">
+<h2>Output<a class="headerlink" href="#output" title="Link to this heading">¶</a></h2>
+<p>When using <code class="docutils literal notranslate"><span class="pre">--export</span></code>, figures are saved to <code class="docutils literal notranslate"><span class="pre">{folder_name}/</span></code> directory as PNG files.</p>
+</section>
+<section id="typical-workflow">
+<h2>Typical Workflow<a class="headerlink" href="#typical-workflow" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="c1"># 1. Generate data and train models (see: comparison command)</span>
+comparison<span class="w"> </span>--generate<span class="w"> </span>--steps<span class="o">=</span><span class="m">100</span><span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--without<span class="w"> </span>--model<span class="o">=</span>RB<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+
+<span class="c1"># 2. Visualize results</span>
+plot-compare<span class="w"> </span>--plot_RB_errors<span class="w"> </span>--GT<span class="w"> </span>--without<span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+
+<span class="c1"># 3. Generate additional plots</span>
+plot-compare<span class="w"> </span>--plot_m<span class="w"> </span>--plot_E<span class="w"> </span>--plot_L<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+plot-compare<span class="w"> </span>--plot_Es<span class="w"> </span>--plot_Ls<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Direct Poisson Neural Networks</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/training.html">Training (dpnn.training)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/postprocessing.html">Postprocessing (dpnn.postprocessing)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">plot-compare - Visualize and Compare Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.get_frames_and_titles"><code class="docutils literal notranslate"><span class="pre">get_frames_and_titles()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_fields_from_dataframes"><code class="docutils literal notranslate"><span class="pre">plot_fields_from_dataframes()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_first"><code class="docutils literal notranslate"><span class="pre">plot_first()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_fields_errors"><code class="docutils literal notranslate"><span class="pre">plot_fields_errors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_compatibility_errors"><code class="docutils literal notranslate"><span class="pre">plot_compatibility_errors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_L_errors"><code class="docutils literal notranslate"><span class="pre">plot_L_errors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_l_models"><code class="docutils literal notranslate"><span class="pre">plot_l_models()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.plot_energy_models"><code class="docutils literal notranslate"><span class="pre">plot_energy_models()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#dpnn.postprocessing.plot_compare.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#command-options">Command Options</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-workflows">Example Workflows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#output">Output</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#typical-workflow">Typical Workflow</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="comparison.html" title="previous chapter">comparison - Generate and Compare Models</a></li>
+      <li>Next: <a href="learn.html" title="next chapter">learn - Train Neural Network Models</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023, Martin Šípka, Michal Pavelka, Oğul Esen, and Miroslav Grmela.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/cli/plot_compare.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

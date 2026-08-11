@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>TrajectoryDataset (Legacy API Reference) &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=eeb27264" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="trajectorydataset-legacy-api-reference">
+<h1>TrajectoryDataset (Legacy API Reference)<a class="headerlink" href="#trajectorydataset-legacy-api-reference" title="Link to this heading">¶</a></h1>
+<p>The TrajectoryDataset class is now located in the <code class="docutils literal notranslate"><span class="pre">dpnn.data</span></code> module.</p>
+<dl class="py class" id="module-dpnn.data.dataset">
+<dt class="sig sig-object py" id="dpnn.data.dataset.TrajectoryDataset">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">dpnn.data.dataset.</span></span><span class="sig-name descname"><span class="pre">TrajectoryDataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataframe</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'RB'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_data_to_gpu</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dim</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.data.dataset.TrajectoryDataset" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Dataset</span></code></p>
+<p>TRAJECTORY DATASET</p>
+</dd></dl>
+
+<p>For new code, import from:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dpnn.data</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrajectoryDataset</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">dpnn.data.dataset</span><span class="w"> </span><span class="kn">import</span> <span class="n">TrajectoryDataset</span>  <span class="c1"># Alternative</span>
+</pre></div>
+</div>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Direct Poisson Neural Networks</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/training.html">Training (dpnn.training)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/postprocessing.html">Postprocessing (dpnn.postprocessing)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/plot_compare.html">plot-compare - Visualize and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023, Martin Šípka, Michal Pavelka, Oğul Esen, and Miroslav Grmela.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/TrajectoryDataset.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

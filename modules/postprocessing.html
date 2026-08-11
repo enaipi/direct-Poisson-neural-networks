@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Postprocessing (dpnn.postprocessing) &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=eeb27264" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="comparison - Generate and Compare Models" href="../cli/comparison.html" />
+    <link rel="prev" title="Data (dpnn.data)" href="data.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="postprocessing-dpnn-postprocessing">
+<h1>Postprocessing (dpnn.postprocessing)<a class="headerlink" href="#postprocessing-dpnn-postprocessing" title="Link to this heading">¶</a></h1>
+<p>The postprocessing module contains visualization and analysis tools for comparing learned models with ground truth data.</p>
+<section id="plot-compare-plot-compare">
+<h2>Plot Compare (plot_compare)<a class="headerlink" href="#plot-compare-plot-compare" title="Link to this heading">¶</a></h2>
+<p>CLI tool for visualizing and comparing trajectories from different models. Accessible via the <code class="docutils literal notranslate"><span class="pre">plot-compare</span></code> console command.</p>
+<p id="module-dpnn.postprocessing.plot_compare">Comparison and visualization of learned Poisson structures.</p>
+<p>This module provides tools to:
+- Load and process trajectory data
+- Visualize learned vs ground truth Poisson structures
+- Compute compatibility errors
+- Compare old Learner vs GeneralSystemLearner models</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.get_frames_and_titles">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">get_frames_and_titles</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.get_frames_and_titles" title="Link to this definition">¶</a></dt>
+<dd><p>Get list of dataframes and titles to plot based on args.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_fields_from_dataframes">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_fields_from_dataframes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">field_list</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_fields_from_dataframes" title="Link to this definition">¶</a></dt>
+<dd><p>Plot specified fields from dataframes.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_first">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_first</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">field</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_first" title="Link to this definition">¶</a></dt>
+<dd><p>Plot only first trajectory for a field.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_fields_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_fields_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fields</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">field_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_fields_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot histograms of field errors (learned vs ground truth).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_compatibility_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_compatibility_errors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_compatibility_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot L compatibility errors.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_L_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_L_errors</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_L_errors" title="Link to this definition">¶</a></dt>
+<dd><p>Plot L matrix reconstruction errors.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_l_models">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_l_models</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_l_models" title="Link to this definition">¶</a></dt>
+<dd><p>Plot learned L models from neural networks.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.plot_energy_models">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">plot_energy_models</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.plot_energy_models" title="Link to this definition">¶</a></dt>
+<dd><p>Plot learned energy models from neural networks.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.postprocessing.plot_compare.main">
+<span class="sig-prename descclassname"><span class="pre">dpnn.postprocessing.plot_compare.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.postprocessing.plot_compare.main" title="Link to this definition">¶</a></dt>
+<dd><p>Main entry point for plot_compare script.</p>
+</dd></dl>
+
+</section>
+<section id="example-usage">
+<h2>Example Usage<a class="headerlink" href="#example-usage" title="Link to this heading">¶</a></h2>
+<p>Plot comparison of learned models with ground truth:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_RB_errors<span class="w"> </span>--GT<span class="w"> </span>--without<span class="w"> </span>--implicit<span class="w"> </span>--soft<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+<p>Plot specific fields:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_m<span class="w"> </span>--plot_E<span class="w"> </span>--plot_L
+</pre></div>
+</div>
+<p>Plot energy surfaces:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--plot_Es<span class="w"> </span>--without<span class="w"> </span>--soft<span class="w"> </span>--implicit<span class="w"> </span>--folder_name<span class="o">=</span>TEST
+</pre></div>
+</div>
+<p>View available options:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>plot-compare<span class="w"> </span>--help
+</pre></div>
+</div>
+</section>
+<section id="features">
+<h2>Features<a class="headerlink" href="#features" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p>Compare multiple models (without Jacobi, soft Jacobi, implicit Jacobi)</p></li>
+<li><p>Plot various fields (momentum, energy, angular momentum, etc.)</p></li>
+<li><p>Export figures to PNG</p></li>
+<li><p>Support for different mechanical systems (RB, HT, P3D, etc.)</p></li>
+<li><p>Error analysis and visualization</p></li>
+</ul>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Direct Poisson Neural Networks</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training (dpnn.training)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Postprocessing (dpnn.postprocessing)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#plot-compare-plot-compare">Plot Compare (plot_compare)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#features">Features</a></li>
+</ul>
+</li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/plot_compare.html">plot-compare - Visualize and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="data.html" title="previous chapter">Data (dpnn.data)</a></li>
+      <li>Next: <a href="../cli/comparison.html" title="next chapter">comparison - Generate and Compare Models</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023, Martin Šípka, Michal Pavelka, Oğul Esen, and Miroslav Grmela.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/modules/postprocessing.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

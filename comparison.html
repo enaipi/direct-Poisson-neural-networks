@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>comparison.py (Legacy Reference) &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=eeb27264" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=039e1c02" />
+    <script src="_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="_static/doctools.js?v=888ff710"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="comparison-py-legacy-reference">
+<h1>comparison.py (Legacy Reference)<a class="headerlink" href="#comparison-py-legacy-reference" title="Link to this heading">¶</a></h1>
+<p>This file has been moved and reorganized. See the CLI reference:</p>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/comparison.html">comparison - Generate and Compare Models</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.check_folder"><code class="docutils literal notranslate"><span class="pre">check_folder()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.model"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.model</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.steps"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.steps</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.scheme"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.scheme</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.methods"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.methods</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_mx"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_mx</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_my"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_my</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_mz"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_mz</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_rx"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_rx</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_ry"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_ry</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.init_rz"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.init_rz</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.Ix"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.Ix</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.Iy"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.Iy</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.Iz"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.Iz</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.Mgl"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.Mgl</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.M_tau"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.M_tau</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.M"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.M</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.neurons"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.neurons</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.layers"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.layers</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.batch_size"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.batch_size</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.dt"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.dt</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.alpha"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.alpha</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.lr"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.lr</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.epochs"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.epochs</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.prefactor"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.prefactor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.jac_prefactor"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.jac_prefactor</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.dropout_rate"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.dropout_rate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.quad_features"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.quad_features</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.const_L"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.const_L</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.generate"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.generate</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.external_data"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.external_data</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.external_data_simple_format"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.external_data_simple_format</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.sampling"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.sampling</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.points"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.points</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.seed"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.seed</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.jacobi_loss_mode"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.jacobi_loss_mode</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.hutchinson_samples"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.hutchinson_samples</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.folder_name"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.folder_name</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.cuda"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.cuda</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.multiprocessing"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.multiprocessing</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.simulation_batch_size"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.simulation_batch_size</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.no_data_to_gpu"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.no_data_to_gpu</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.theta_sampling"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.theta_sampling</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.dimensions"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.dimensions</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.zeta"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.zeta</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.verbose"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.verbose</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.no_show"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.no_show</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.device"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.device</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonConfig.to_namespace"><code class="docutils literal notranslate"><span class="pre">ComparisonConfig.to_namespace()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonRunner"><code class="docutils literal notranslate"><span class="pre">ComparisonRunner</span></code></a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.ComparisonRunner.run"><code class="docutils literal notranslate"><span class="pre">ComparisonRunner.run()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.norm"><code class="docutils literal notranslate"><span class="pre">norm()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.generate_initial_conditions"><code class="docutils literal notranslate"><span class="pre">generate_initial_conditions()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.load_initial_conditions"><code class="docutils literal notranslate"><span class="pre">load_initial_conditions()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.split_into_batches"><code class="docutils literal notranslate"><span class="pre">split_into_batches()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.simulate_batch_normal"><code class="docutils literal notranslate"><span class="pre">simulate_batch_normal()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.simulate_batch_implicit"><code class="docutils literal notranslate"><span class="pre">simulate_batch_implicit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.simulate_batch_soft"><code class="docutils literal notranslate"><span class="pre">simulate_batch_soft()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.simulate_batch_without"><code class="docutils literal notranslate"><span class="pre">simulate_batch_without()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.run_simulation"><code class="docutils literal notranslate"><span class="pre">run_simulation()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.models_exist"><code class="docutils literal notranslate"><span class="pre">models_exist()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.generate_trajectories"><code class="docutils literal notranslate"><span class="pre">generate_trajectories()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.add_plot"><code class="docutils literal notranslate"><span class="pre">add_plot()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.plot_training_errors"><code class="docutils literal notranslate"><span class="pre">plot_training_errors()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.resolve_automatic_dt"><code class="docutils literal notranslate"><span class="pre">resolve_automatic_dt()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#dpnn.comparison.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#usage">Usage</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#command-options">Command Options</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="cli/comparison.html#common-arguments">Common Arguments</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#example-workflows">Example Workflows</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cli/comparison.html#step-by-step-alternative">Step-by-step Alternative</a></li>
+</ul>
+</li>
+</ul>
+</div>
+<p>For module documentation:</p>
+<p id="module-dpnn.comparison">Pure Python comparison script for Poisson structure learning.</p>
+<dl>
+<dt>Usage as Python:</dt><dd><p>from dpnn.comparison import ComparisonConfig, ComparisonRunner</p>
+<dl class="simple">
+<dt>config = ComparisonConfig(</dt><dd><p>model=”RB”,
+steps=100,
+methods=[“implicit”, “soft”, “without”],
+folder_name=”TEST”</p>
+</dd>
+</dl>
+<p>)
+runner = ComparisonRunner(config)
+runner.run()</p>
+</dd>
+<dt>Usage as CLI:</dt><dd><p>python comparison.py –model=RB –steps=100 –implicit –soft –without –folder_name=TEST</p>
+</dd>
+</dl>
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.check_folder">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">check_folder</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="headerlink" href="#dpnn.comparison.check_folder" title="Link to this definition">¶</a></dt>
+<dd><p>Check if a folder exists and create all necessary subdirectories.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">ComparisonConfig</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'RB'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">steps</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scheme</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'IMR'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">methods</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">&lt;factory&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_mx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_my</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_mz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">4.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_rx</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_ry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">-3.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">init_rz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Ix</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Iy</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Iz</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">40.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">Mgl</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.9810000000000001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M_tau</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">M</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">neurons</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">64</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">layers</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">32</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epochs</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">prefactor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jac_prefactor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dropout_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">quad_features</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">const_L</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">generate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">external_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">external_data_simple_format</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">42</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jacobi_loss_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'exact'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">hutchinson_samples</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">folder_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'.'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cuda</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">multiprocessing</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">simulation_batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">256</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_data_to_gpu</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">theta_sampling</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">20</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dimensions</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">zeta</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">no_show</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Configuration for comparison run.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.model">
+<span class="sig-name descname"><span class="pre">model</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'RB'</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.model" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.steps">
+<span class="sig-name descname"><span class="pre">steps</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.steps" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.scheme">
+<span class="sig-name descname"><span class="pre">scheme</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'IMR'</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.scheme" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.methods">
+<span class="sig-name descname"><span class="pre">methods</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.methods" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_mx">
+<span class="sig-name descname"><span class="pre">init_mx</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_mx" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_my">
+<span class="sig-name descname"><span class="pre">init_my</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_my" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_mz">
+<span class="sig-name descname"><span class="pre">init_mz</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">4.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_mz" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_rx">
+<span class="sig-name descname"><span class="pre">init_rx</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_rx" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_ry">
+<span class="sig-name descname"><span class="pre">init_ry</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">-3.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_ry" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.init_rz">
+<span class="sig-name descname"><span class="pre">init_rz</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.init_rz" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.Ix">
+<span class="sig-name descname"><span class="pre">Ix</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.Ix" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.Iy">
+<span class="sig-name descname"><span class="pre">Iy</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.Iy" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.Iz">
+<span class="sig-name descname"><span class="pre">Iz</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">40.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.Iz" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.Mgl">
+<span class="sig-name descname"><span class="pre">Mgl</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.9810000000000001</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.Mgl" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.M_tau">
+<span class="sig-name descname"><span class="pre">M_tau</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.M_tau" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.M">
+<span class="sig-name descname"><span class="pre">M</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.5</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.M" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.neurons">
+<span class="sig-name descname"><span class="pre">neurons</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">64</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.neurons" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.layers">
+<span class="sig-name descname"><span class="pre">layers</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.layers" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.batch_size">
+<span class="sig-name descname"><span class="pre">batch_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">32</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.batch_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.dt">
+<span class="sig-name descname"><span class="pre">dt</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.dt" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.alpha">
+<span class="sig-name descname"><span class="pre">alpha</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">2.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.alpha" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.lr">
+<span class="sig-name descname"><span class="pre">lr</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.001</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.lr" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.epochs">
+<span class="sig-name descname"><span class="pre">epochs</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.epochs" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.prefactor">
+<span class="sig-name descname"><span class="pre">prefactor</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.prefactor" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.jac_prefactor">
+<span class="sig-name descname"><span class="pre">jac_prefactor</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">1.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.jac_prefactor" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.dropout_rate">
+<span class="sig-name descname"><span class="pre">dropout_rate</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.3</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.dropout_rate" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.quad_features">
+<span class="sig-name descname"><span class="pre">quad_features</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.quad_features" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.const_L">
+<span class="sig-name descname"><span class="pre">const_L</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.const_L" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.generate">
+<span class="sig-name descname"><span class="pre">generate</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.generate" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.external_data">
+<span class="sig-name descname"><span class="pre">external_data</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.external_data" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.external_data_simple_format">
+<span class="sig-name descname"><span class="pre">external_data_simple_format</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.external_data_simple_format" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.sampling">
+<span class="sig-name descname"><span class="pre">sampling</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.sampling" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.points">
+<span class="sig-name descname"><span class="pre">points</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">100</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.points" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.seed">
+<span class="sig-name descname"><span class="pre">seed</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">42</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.seed" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.jacobi_loss_mode">
+<span class="sig-name descname"><span class="pre">jacobi_loss_mode</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'exact'</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.jacobi_loss_mode" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.hutchinson_samples">
+<span class="sig-name descname"><span class="pre">hutchinson_samples</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">3</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.hutchinson_samples" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.folder_name">
+<span class="sig-name descname"><span class="pre">folder_name</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'.'</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.folder_name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.cuda">
+<span class="sig-name descname"><span class="pre">cuda</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.cuda" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.multiprocessing">
+<span class="sig-name descname"><span class="pre">multiprocessing</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.multiprocessing" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.simulation_batch_size">
+<span class="sig-name descname"><span class="pre">simulation_batch_size</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">256</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.simulation_batch_size" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.no_data_to_gpu">
+<span class="sig-name descname"><span class="pre">no_data_to_gpu</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">True</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.no_data_to_gpu" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.theta_sampling">
+<span class="sig-name descname"><span class="pre">theta_sampling</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">20</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.theta_sampling" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.dimensions">
+<span class="sig-name descname"><span class="pre">dimensions</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">10</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.dimensions" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.zeta">
+<span class="sig-name descname"><span class="pre">zeta</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">0.0</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.zeta" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.verbose">
+<span class="sig-name descname"><span class="pre">verbose</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.verbose" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.no_show">
+<span class="sig-name descname"><span class="pre">no_show</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></span><span class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.no_show" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.device">
+<span class="sig-name descname"><span class="pre">device</span></span><span class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">device</span></span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.device" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonConfig.to_namespace">
+<span class="sig-name descname"><span class="pre">to_namespace</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.ComparisonConfig.to_namespace" title="Link to this definition">¶</a></dt>
+<dd><p>Convert to argparse.Namespace for backward compatibility with helper functions.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonRunner">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">ComparisonRunner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">config</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#dpnn.comparison.ComparisonConfig" title="dpnn.comparison.ComparisonConfig"><span class="pre">ComparisonConfig</span></a></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.ComparisonRunner" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Runs comparison of different learning methods.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="dpnn.comparison.ComparisonRunner.run">
+<span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.ComparisonRunner.run" title="Link to this definition">¶</a></dt>
+<dd><p>Run the full comparison.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.norm">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">norm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">z</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.norm" title="Link to this definition">¶</a></dt>
+<dd><p>The norm function calculates the magnitude of a vector in three-dimensional space.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> – The parameter “x” represents the value of the x-coordinate in a three-dimensional space</p></li>
+<li><p><strong>y</strong> – The parameter “y” represents the y-coordinate of a point in a three-dimensional space</p></li>
+<li><p><strong>z</strong> – The parameter “z” represents the value of the z-coordinate in a three-dimensional space</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the square root of the sum of the squares of the three input values (x, y, and z).</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.generate_initial_conditions">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">generate_initial_conditions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.generate_initial_conditions" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.load_initial_conditions">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">load_initial_conditions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">filename</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">device</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.load_initial_conditions" title="Link to this definition">¶</a></dt>
+<dd><p>Loads initial conditions from a CSV file and returns a PyTorch tensor.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.split_into_batches">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">split_into_batches</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch_size</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.split_into_batches" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.simulate_batch_normal">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">simulate_batch_normal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch_initial_conditions_and_args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.simulate_batch_normal" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.simulate_batch_implicit">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">simulate_batch_implicit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch_initial_conditions_and_args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.simulate_batch_implicit" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.simulate_batch_soft">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">simulate_batch_soft</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch_initial_conditions_and_args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.simulate_batch_soft" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.simulate_batch_without">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">simulate_batch_without</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">batch_initial_conditions_and_args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.simulate_batch_without" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.run_simulation">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">run_simulation</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sim_func</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">argss</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_multiprocessing</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.run_simulation" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.models_exist">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">models_exist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">folder_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.models_exist" title="Link to this definition">¶</a></dt>
+<dd><p>Check if saved models exist for a given method.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.generate_trajectories">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">generate_trajectories</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.generate_trajectories" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>generate_trajectories</cite> generates and saves trajectories based on the given arguments, either using a deterministic approach or simulating with learned models, or loads external data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>args</strong> – The <cite>args</cite> parameter is a dictionary or object that contains various arguments or parameters for the <cite>generate_trajectories</cite> function. These arguments control the behavior of the function and determine what kind of trajectories are generated or simulated</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.add_plot">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">add_plot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.add_plot" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>add_plot</cite> adds a line plot to pyplot, with the option to specify x and y data and a label for the plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ax</strong> – The matplotlib.pyplot module (or axes object)</p></li>
+<li><p><strong>x</strong> – The x-axis values for the plot. If provided, the plot will be a line plot with x and y values. If not provided, the plot will be a line plot with only y values</p></li>
+<li><p><strong>y</strong> – The <cite>y</cite> parameter is a list or array of values that represent the y-coordinates of the data points to be plotted</p></li>
+<li><p><strong>name</strong> – The name parameter is a string that represents the label for the plot. It is used to identify the plot in the legend of the graph</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.plot_training_errors">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">plot_training_errors</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.plot_training_errors" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>plot_training_errors</cite> reads error data from CSV files and plots the training and validation errors for different scenarios.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>args</strong> – The <cite>args</cite> parameter is an object that contains the following attributes:</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.resolve_automatic_dt">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">resolve_automatic_dt</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">args</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.resolve_automatic_dt" title="Link to this definition">¶</a></dt>
+<dd><p>The function <cite>resolve_automatic_dt</cite> calculates the time step <cite>dt</cite> based on the given model and
+parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>args</strong> – args is a dictionary or object that contains the following parameters:</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>the value of dt, which is the time step for the simulation.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="dpnn.comparison.main">
+<span class="sig-prename descclassname"><span class="pre">dpnn.comparison.</span></span><span class="sig-name descname"><span class="pre">main</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#dpnn.comparison.main" title="Link to this definition">¶</a></dt>
+<dd><p>Pure Python main entry point for comparison script.</p>
+<p>Supports CLI via argparse for backward compatibility, but uses
+ComparisonRunner internally for clean code.</p>
+</dd></dl>
+
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">Direct Poisson Neural Networks</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="modules/models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/training.html">Training (dpnn.training)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="modules/postprocessing.html">Postprocessing (dpnn.postprocessing)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="cli/comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/plot_compare.html">plot-compare - Visualize and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli/simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023, Martin Šípka, Michal Pavelka, Oğul Esen, and Miroslav Grmela.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/comparison.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Training (dpnn.training) &#8212; Direct Poisson Neural Networks 1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=4f649999" />
+    <link rel="stylesheet" type="text/css" href="../_static/basic.css?v=eeb27264" />
+    <link rel="stylesheet" type="text/css" href="../_static/alabaster.css?v=039e1c02" />
+    <script src="../_static/documentation_options.js?v=f2a433a1"></script>
+    <script src="../_static/doctools.js?v=888ff710"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Simulation (dpnn.simulation)" href="simulation.html" />
+    <link rel="prev" title="Models (dpnn.models)" href="models.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="training-dpnn-training">
+<h1>Training (dpnn.training)<a class="headerlink" href="#training-dpnn-training" title="Link to this heading">¶</a></h1>
+<p>The training module contains the neural network learner classes and CLI interface for training energy and tensor network models on trajectory data.</p>
+<section id="learner-classes-learner">
+<h2>Learner Classes (learner)<a class="headerlink" href="#learner-classes-learner" title="Link to this heading">¶</a></h2>
+<p>Contains the Learner class hierarchy for training different types of models:
+- <strong>Learner</strong>: Base learner class
+- <strong>LearnerIMR</strong>: Learner for implicit method with Jacobi correction
+- <strong>LearnerRK4</strong>: Learner with RK4 integrator</p>
+</section>
+<section id="cli-interface-learn">
+<h2>CLI Interface (learn)<a class="headerlink" href="#cli-interface-learn" title="Link to this heading">¶</a></h2>
+<p>Command-line interface for training models. Accessible via the <code class="docutils literal notranslate"><span class="pre">learn</span></code> console command.</p>
+</section>
+<section id="example-usage">
+<h2>Example Usage<a class="headerlink" href="#example-usage" title="Link to this heading">¶</a></h2>
+<p>Train a model using the CLI:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>learn<span class="w"> </span>--method<span class="o">=</span>without<span class="w"> </span>--model<span class="o">=</span>RB
+learn<span class="w"> </span>--method<span class="o">=</span>implicit<span class="w"> </span>--model<span class="o">=</span>RB
+learn<span class="w"> </span>--method<span class="o">=</span>soft<span class="w"> </span>--model<span class="o">=</span>RB
+</pre></div>
+</div>
+<p>View available options:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>learn<span class="w"> </span>--help
+</pre></div>
+</div>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">Direct Poisson Neural Networks</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Core Modules:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="models.html">Models (dpnn.models)</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Training (dpnn.training)</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#learner-classes-learner">Learner Classes (learner)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#cli-interface-learn">CLI Interface (learn)</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#example-usage">Example Usage</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="simulation.html">Simulation (dpnn.simulation)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="data.html">Data (dpnn.data)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="postprocessing.html">Postprocessing (dpnn.postprocessing)</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">CLI Reference:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../cli/comparison.html">comparison - Generate and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/plot_compare.html">plot-compare - Visualize and Compare Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/learn.html">learn - Train Neural Network Models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../cli/simulate.html">simulate - Generate Trajectories</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="models.html" title="previous chapter">Models (dpnn.models)</a></li>
+      <li>Next: <a href="simulation.html" title="next chapter">Simulation (dpnn.simulation)</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2023, Martin Šípka, Michal Pavelka, Oğul Esen, and Miroslav Grmela.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 9.1.0</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="../_sources/modules/training.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
